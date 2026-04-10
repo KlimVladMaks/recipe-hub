@@ -56,6 +56,44 @@ model User {
 }
 
 
+model Recipe { 
+  id           Int         @id @default(autoincrement())
+  authorId     Int         @map("author_id")
+  title        String      @db.VarChar(255)
+  description  String?     @db.Text
+  difficulty   Difficulty
+  createdAt    DateTime    @map("created_at") @default(now())
+  updatedAt    DateTime    @map("updated_at") @updatedAt
+  isPublished  Boolean     @map("is_published") @default(false)
+
+  author             User                @relation(fields: [authorId], references: [id])
+  recipeDishTypes    RecipeDishType[]
+  savedBy            SavedRecipe[]
+  comments           Comment[]
+  recipeIngredients  RecipeIngredient[]  
+  ratings            RecipeRating[]
+  steps              RecipeStep[]
+  media              RecipeMedia[]
+
+  @@map("recipes")
+}
+
+
+model RecipeMedia {
+  id         Int        @id @default(autoincrement())
+  recipeId   Int        @map("recipe_step_id")
+  sortOrder  Int        @map("sort_order")
+  mediaType  MediaType  @map("media_type")
+  mediaUrl   String     @map("media_url") @db.VarChar(2048)
+  createdAt  DateTime   @map("created_at") @default(now())
+  updatedAt  DateTime   @map("updated_at") @updatedAt
+
+  recipe Recipe @relation(fields: [recipeId], references: [id])
+
+  @@map("recipe_media")
+}
+
+
 model DishType {
   id         Int       @id @default(autoincrement())
   title      String    @db.VarChar(255)
@@ -69,55 +107,15 @@ model DishType {
 
 
 model RecipeDishType {
-  id  Int  @id @default(autoincrement())
+  id          Int  @id @default(autoincrement())
   dishTypeId  Int  @map("dish_type_id")
-  recipeId  Int  @map("recipe_id")
+  recipeId    Int  @map("recipe_id")
 
   dishType  DishType  @relation(fields: [dishTypeId], references: [id])
-  recipe  Recipe  @relation(fields: [recipeId], references: [id])
+  recipe    Recipe    @relation(fields: [recipeId], references: [id])
 
+  @@unique([dishTypeId, recipeId])
   @@map("recipe_dish_types")
-}
-
-
-model Recipe { 
-  id           Int         @id @default(autoincrement())
-  authorId     Int         @map("author_id")
-  title        String      @db.VarChar(255)
-  description  String?     @db.Text
-  difficulty   Difficulty
-  createdAt    DateTime    @map("created_at") @default(now())
-  updatedAt    DateTime    @map("updated_at") @updatedAt
-  isPublished  Boolean     @map("is_published") @default(false)
-
-  recipeDishTypes  RecipeDishType[]
-}
-
-
-model SavedRecipe {
-  id        Int       @id @default(autoincrement())
-  userId    Int       @map("user_id")
-  recipeId  Int       @map("recipe_id")
-  savedAt   DateTime  @map("saved_at") @default(now())
-}
-
-
-model Subscription {
-  id              Int       @id @default(autoincrement())
-  subscriberId    Int       @map("subscriber_id")
-  subscribedToId  Int       @map("subscribed_to_id")
-  subscribedAt    DateTime  @map("subscribed_at") @default(now())
-}
-
-
-model Comment {
-  id         Int       @id @default(autoincrement())
-  userId     Int       @map("user_id")
-  recipeId   Int       @map("recipe_id")
-  parentId   Int?      @map("parent_id")
-  text       String    @db.Text
-  createdAt  DateTime  @map("created_at") @default(now())
-  updatedAt  DateTime  @map("updated_at") @updatedAt
 }
 
 
@@ -126,15 +124,10 @@ model Ingredient {
   title      String    @db.VarChar(255)
   createdAt  DateTime  @map("created_at") @default(now())
   updatedAt  DateTime  @map("updated_at") @updatedAt
-}
 
+  recipeIngredients RecipeIngredient[]
 
-model Unit {
-  id            Int       @id @default(autoincrement())
-  title         String    @db.VarChar(255)
-  abbreviation  String?   @db.VarChar(20)
-  createdAt     DateTime  @map("created_at") @default(now())
-  updatedAt     DateTime  @map("updated_at") @updatedAt
+  @@map("ingredients")
 }
 
 
@@ -146,23 +139,25 @@ model RecipeIngredient {
   quantity         Float?  
   altUnitText      String?  @map("alt_unit_text") @db.VarChar(255)
   preparationNote  String?  @map("preparation_note") @db.VarChar(255)
+
+  ingredient  Ingredient  @relation(fields: [ingredientId], references: [id])
+  recipe      Recipe      @relation(fields: [recipeId], references: [id])
+  unit        Unit?        @relation(fields: [unitId], references: [id])
+
+  @@map("recipe_ingredients")
 }
 
 
-model CommentLike {
-  id         Int       @id @default(autoincrement())
-  userId     Int       @map("user_id")
-  commentId  Int       @map("comment_id")
-  likedAt    DateTime  @map("liked_at") @default(now())
-}
+model Unit {
+  id            Int       @id @default(autoincrement())
+  title         String    @db.VarChar(255)
+  abbreviation  String?   @db.VarChar(20)
+  createdAt     DateTime  @map("created_at") @default(now())
+  updatedAt     DateTime  @map("updated_at") @updatedAt
 
+  recipeIngredients RecipeIngredient[]
 
-model RecipeRating {
-  id        Int       @id @default(autoincrement())
-  userId    Int       @map("user_id")
-  recipeId  Int       @map("recipe_id")
-  rating    Int  
-  ratedAt   DateTime  @map("rated_at") @default(now())
+  @@map("units")
 }
 
 
@@ -174,6 +169,11 @@ model RecipeStep {
   description  String?   @db.Text
   createdAt    DateTime  @map("created_at") @default(now())
   updatedAt    DateTime  @map("updated_at") @updatedAt
+
+  recipe  Recipe             @relation(fields: [recipeId], references: [id])
+  media   RecipeStepMedia[]
+
+  @@map("recipe_steps")
 }
 
 
@@ -185,15 +185,84 @@ model RecipeStepMedia {
   mediaUrl      String     @map("media_url") @db.VarChar(2048)
   createdAt     DateTime   @map("created_at") @default(now())
   updatedAt     DateTime   @map("updated_at") @updatedAt
+
+  recipeStep RecipeStep @relation(fields: [recipeStepId], references: [id])
+
+  @@map("recipe_step_media")
 }
 
 
-model RecipeMedia {
-  id         Int        @id @default(autoincrement())
-  recipeId   Int        @map("recipe_step_id")
-  sortOrder  Int        @map("sort_order")
-  mediaType  MediaType  @map("media_type")
-  mediaUrl   String     @map("media_url") @db.VarChar(2048)
-  createdAt  DateTime   @map("created_at") @default(now())
-  updatedAt  DateTime   @map("updated_at") @updatedAt
+model SavedRecipe {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  recipeId  Int       @map("recipe_id")
+  savedAt   DateTime  @map("saved_at") @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  recipe  Recipe  @relation(fields: [recipeId], references: [id])
+
+  @@unique([userId, recipeId])
+  @@map("saved_recipes")
+}
+
+
+model Comment {
+  id         Int       @id @default(autoincrement())
+  userId     Int       @map("user_id")
+  recipeId   Int       @map("recipe_id")
+  parentId   Int?      @map("parent_id")
+  text       String    @db.Text
+  createdAt  DateTime  @map("created_at") @default(now())
+  updatedAt  DateTime  @map("updated_at") @updatedAt
+
+  user     User           @relation(fields: [userId], references: [id])
+  recipe   Recipe         @relation(fields: [recipeId], references: [id])
+  parent   Comment?       @relation("CommentToComment", fields: [parentId], references: [id])
+  replies  Comment[]      @relation("CommentToComment")
+  likes    CommentLike[]
+
+  @@map("comments")
+}
+
+
+model CommentLike {
+  id         Int       @id @default(autoincrement())
+  userId     Int       @map("user_id")
+  commentId  Int       @map("comment_id")
+  likedAt    DateTime  @map("liked_at") @default(now())
+
+  user     User     @relation(fields: [userId], references: [id])
+  comment  Comment  @relation(fields: [commentId], references: [id])
+
+  @@unique([userId, commentId])
+  @@map("comment_likes")
+}
+
+
+model RecipeRating {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  recipeId  Int       @map("recipe_id")
+  rating    Int  
+  ratedAt   DateTime  @map("rated_at") @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  recipe  Recipe  @relation(fields: [recipeId], references: [id])
+
+  @@unique([userId, recipeId])
+  @@map("recipe_ratings")
+}
+
+
+model Subscription {
+  id              Int       @id @default(autoincrement())
+  subscriberId    Int       @map("subscriber_id")
+  subscribedToId  Int       @map("subscribed_to_id")
+  subscribedAt    DateTime  @map("subscribed_at") @default(now())
+
+  subscriber    User  @relation("subscriber", fields: [subscriberId], references: [id])
+  subscribedTo  User  @relation("subscribedTo", fields: [subscribedToId], references: [id])
+
+  @@unique([subscriberId, subscribedToId])
+  @@map("subscriptions")
 }
