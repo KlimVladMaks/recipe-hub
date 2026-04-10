@@ -1,0 +1,199 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+// ========== ENUMS ==========
+
+
+enum Role {
+  user
+  admin
+}
+
+
+enum Difficulty {
+  hard
+  medium
+  easy
+}
+
+
+enum MediaType {
+  photo
+  video
+}
+
+
+// ========== MODELS ==========
+
+
+model User {
+  id            Int       @id @default(autoincrement())
+  username      String    @unique @db.VarChar(255)
+  passwordHash  String    @map("password_hash") @db.VarChar(255)
+  firstName     String    @map("first_name") @db.VarChar(255)
+  lastName      String    @map("last_name") @db.VarChar(255)
+  about         String?   @db.Text
+  role          Role      @default(user)
+  createdAt     DateTime  @map("created_at") @default(now())
+  updatedAt     DateTime  @map("updated_at") @updatedAt
+
+  recipes        Recipe[]
+  savedRecipes   SavedRecipe[]
+  subscriptions  Subscription[]  @relation("subscriber")
+  subscribers    Subscription[]  @relation("subscribedTo")
+  comments       Comment[]
+  commentLikes   CommentLike[]
+  recipeRatings  RecipeRating[]
+
+  @@map("users")
+}
+
+
+model DishType {
+  id         Int       @id @default(autoincrement())
+  title      String    @db.VarChar(255)
+  createdAt  DateTime  @map("created_at") @default(now())
+  updatedAt  DateTime  @map("updated_at") @updatedAt
+
+  recipeDishTypes RecipeDishType[]
+
+  @@map("dish_types")
+}
+
+
+model RecipeDishType {
+  id  Int  @id @default(autoincrement())
+  dishTypeId  Int  @map("dish_type_id")
+  recipeId  Int  @map("recipe_id")
+
+  dishType  DishType  @relation(fields: [dishTypeId], references: [id])
+  recipe  Recipe  @relation(fields: [recipeId], references: [id])
+
+  @@map("recipe_dish_types")
+}
+
+
+model Recipe { 
+  id           Int         @id @default(autoincrement())
+  authorId     Int         @map("author_id")
+  title        String      @db.VarChar(255)
+  description  String?     @db.Text
+  difficulty   Difficulty
+  createdAt    DateTime    @map("created_at") @default(now())
+  updatedAt    DateTime    @map("updated_at") @updatedAt
+  isPublished  Boolean     @map("is_published") @default(false)
+
+  recipeDishTypes  RecipeDishType[]
+}
+
+
+model SavedRecipe {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  recipeId  Int       @map("recipe_id")
+  savedAt   DateTime  @map("saved_at") @default(now())
+}
+
+
+model Subscription {
+  id              Int       @id @default(autoincrement())
+  subscriberId    Int       @map("subscriber_id")
+  subscribedToId  Int       @map("subscribed_to_id")
+  subscribedAt    DateTime  @map("subscribed_at") @default(now())
+}
+
+
+model Comment {
+  id         Int       @id @default(autoincrement())
+  userId     Int       @map("user_id")
+  recipeId   Int       @map("recipe_id")
+  parentId   Int?      @map("parent_id")
+  text       String    @db.Text
+  createdAt  DateTime  @map("created_at") @default(now())
+  updatedAt  DateTime  @map("updated_at") @updatedAt
+}
+
+
+model Ingredient {
+  id         Int       @id @default(autoincrement())
+  title      String    @db.VarChar(255)
+  createdAt  DateTime  @map("created_at") @default(now())
+  updatedAt  DateTime  @map("updated_at") @updatedAt
+}
+
+
+model Unit {
+  id            Int       @id @default(autoincrement())
+  title         String    @db.VarChar(255)
+  abbreviation  String?   @db.VarChar(20)
+  createdAt     DateTime  @map("created_at") @default(now())
+  updatedAt     DateTime  @map("updated_at") @updatedAt
+}
+
+
+model RecipeIngredient {
+  id               Int      @id @default(autoincrement())
+  ingredientId     Int      @map("ingredient_id")
+  recipeId         Int      @map("recipe_id")
+  unitId           Int?     @map("unit_id")
+  quantity         Float?  
+  altUnitText      String?  @map("alt_unit_text") @db.VarChar(255)
+  preparationNote  String?  @map("preparation_note") @db.VarChar(255)
+}
+
+
+model CommentLike {
+  id         Int       @id @default(autoincrement())
+  userId     Int       @map("user_id")
+  commentId  Int       @map("comment_id")
+  likedAt    DateTime  @map("liked_at") @default(now())
+}
+
+
+model RecipeRating {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  recipeId  Int       @map("recipe_id")
+  rating    Int  
+  ratedAt   DateTime  @map("rated_at") @default(now())
+}
+
+
+model RecipeStep {
+  id           Int       @id @default(autoincrement())
+  recipeId     Int       @map("recipe_id")
+  number       Int
+  title        String    @db.VarChar(255)
+  description  String?   @db.Text
+  createdAt    DateTime  @map("created_at") @default(now())
+  updatedAt    DateTime  @map("updated_at") @updatedAt
+}
+
+
+model RecipeStepMedia {
+  id            Int        @id @default(autoincrement())
+  recipeStepId  Int        @map("recipe_step_id")
+  sortOrder     Int        @map("sort_order")
+  mediaType     MediaType  @map("media_type")
+  mediaUrl      String     @map("media_url") @db.VarChar(2048)
+  createdAt     DateTime   @map("created_at") @default(now())
+  updatedAt     DateTime   @map("updated_at") @updatedAt
+}
+
+
+model RecipeMedia {
+  id         Int        @id @default(autoincrement())
+  recipeId   Int        @map("recipe_step_id")
+  sortOrder  Int        @map("sort_order")
+  mediaType  MediaType  @map("media_type")
+  mediaUrl   String     @map("media_url") @db.VarChar(2048)
+  createdAt  DateTime   @map("created_at") @default(now())
+  updatedAt  DateTime   @map("updated_at") @updatedAt
+}

@@ -1,0 +1,7 @@
+{
+  "name": "recipe-hub",
+  "description": "Сервис для обмена рецептами и кулинарных блогов",
+  "main": "index.js",
+  "author": "Владислав Клименков",
+  "type": "commonjs"
+}
