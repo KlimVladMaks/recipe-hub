@@ -49,5 +49,5 @@ npx prisma studio
 
 # Создание клиента Prisma
 # (нужно вызывать после каждого изменения `prisma/schema.prisma`)
-prisma generate
+npx prisma generate
 ```

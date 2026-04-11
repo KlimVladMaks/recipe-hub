@@ -1,0 +1,41 @@
+openapi: 3.0.0
+info:
+  title: RecipeHub API
+  version: 1.0.0
+  description: Сервис для обмена рецептами и кулинарных блогов
+
+servers:
+  - url: http://localhost:3000/api
+    description: API-сервер
+
+paths:
+  /auth/register:
+    post:
+      tags: ["Auth"]
+      summary: Регистрация нового пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        "201":
+          description: Пользователь создан
+
+components:
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [username, first_name, last_name, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        about:
+          type: string
