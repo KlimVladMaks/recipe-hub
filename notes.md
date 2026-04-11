@@ -1,5 +1,11 @@
 # Заметки
 
+## Запуск сервера
+
+```
+npm run dev
+```
+
 ## Docker
 
 ```
@@ -31,9 +37,17 @@ docker volume prune
 docker volume rm $(docker volume ls -q)
 ```
 
-## Миграции Prisma
+## Prisma
 
 ```
+# Миграции
 npx prisma migrate dev --name <название_миграции>
 npx prisma migrate dev
+
+# Запуск Prisma Studio
+npx prisma studio
+
+# Создание клиента Prisma
+# (нужно вызывать после каждого изменения `prisma/schema.prisma`)
+prisma generate
 ```
