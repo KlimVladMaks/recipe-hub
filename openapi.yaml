@@ -27,15 +27,15 @@ components:
   schemas:
     RegisterRequest:
       type: object
-      required: [username, first_name, last_name, password]
+      required: [username, firstName, lastName, password]
       properties:
         username:
           type: string
         password:
           type: string
-        first_name:
+        firstName:
           type: string
-        last_name:
+        lastName:
           type: string
         about:
           type: string

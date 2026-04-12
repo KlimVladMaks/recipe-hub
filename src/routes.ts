@@ -1,8 +1,8 @@
 import { Router } from 'express'
 import validate from 'express-zod-safe'
 
-import { registerRequestSchema } from './schemas/index.js'
-import { AuthController } from './controllers/index.js'
+import { registerRequestSchema } from './schemas/auth.schemas.js'
+import { AuthController } from './controllers/auth.controller.js'
 
 const router = Router()
 
