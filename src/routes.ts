@@ -1,8 +1,9 @@
 import { Router } from 'express'
 import validate from 'express-zod-safe'
 
-import { loginRequestSchema, registerRequestSchema } from './schemas/auth.schemas.js'
+import { changePasswordRequestSchema, loginRequestSchema, registerRequestSchema } from './schemas/auth.schemas.js'
 import { AuthController } from './controllers/auth.controller.js'
+import { authMiddleware } from './middlewares/auth.middleware.js'
 
 const router = Router()
 
@@ -18,6 +19,14 @@ router.post('/auth/login',
         body: loginRequestSchema
     }),
     AuthController.login
+)
+
+router.patch('/users/me/password',
+    authMiddleware,
+    validate({
+        body: changePasswordRequestSchema
+    }),
+    AuthController.changePassword
 )
 
 export default router

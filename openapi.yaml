@@ -4,9 +4,11 @@ info:
   version: 1.0.0
   description: Сервис для обмена рецептами и кулинарных блогов
 
+
 servers:
   - url: http://localhost:3000/api
     description: API-сервер
+
 
 paths:
   /auth/register:
@@ -37,7 +39,30 @@ paths:
         "200":
           description: Получение JWT-токена
 
+  /users/me/password:
+    patch:
+      security:
+        - JWTAuth: []
+      tags: ["Auth"]
+      summary: Изменить пароль текущего пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        "200":
+          description: Пароль успешно изменён
+
+
 components:
+  securitySchemes:
+    JWTAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
     RegisterRequest:
       type: object
@@ -61,4 +86,13 @@ components:
         username:
           type: string
         password:
+          type: string
+
+    ChangePasswordRequest:
+      type: object
+      required: [oldPassword, newPassword]
+      properties:
+        oldPassword:
+          type: string
+        newPassword:
           type: string

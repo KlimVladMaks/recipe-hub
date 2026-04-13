@@ -64,4 +64,26 @@ export class AuthService {
             jwtToken: token,
         }
     }
+
+    static async changePassword(userId: number, oldPassword: string, newPassword: string) {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+        });
+        if (!user) {
+            throw new Error('Пользователь не найден');
+        }
+
+        const isPasswordValid = await bcrypt.compare(oldPassword, user.passwordHash);
+        if (!isPasswordValid) {
+            throw new Error('Старый пароль неверен');
+        }
+
+        const newPasswordHash = await bcrypt.hash(newPassword, 10);
+        await prisma.user.update({
+            where: { id: userId },
+            data: { passwordHash: newPasswordHash },
+        });
+
+        return;
+    }
 }
