@@ -23,6 +23,20 @@ paths:
         "201":
           description: Пользователь создан
 
+  /auth/login:
+    post:
+      tags: ["Auth"]
+      summary: Авторизация пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        "200":
+          description: Получение JWT-токена
+
 components:
   schemas:
     RegisterRequest:
@@ -38,4 +52,13 @@ components:
         lastName:
           type: string
         about:
+          type: string
+    
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
           type: string

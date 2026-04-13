@@ -16,7 +16,6 @@ export const authMiddleware = (
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         res.status(401).json({ 
-            success: false,
             message: 'JWT-токен не предоставлен',
         });
         return;
@@ -26,7 +25,6 @@ export const authMiddleware = (
 
     if (!token) {
         res.status(401).json({ 
-            success: false,
             message: 'Некорректный формат JWT-токена',
         });
         return;
@@ -38,7 +36,6 @@ export const authMiddleware = (
         next();
     } catch (error) {
         res.status(401).json({ 
-            success: false,
             message: 'Недействительный JWT-токен' 
         });
     }

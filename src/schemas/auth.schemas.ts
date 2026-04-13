@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { userReadSchema } from './user.schemas.js';
 
 
 export const registerRequestSchema = z.object({
@@ -23,3 +24,10 @@ export const changePasswordRequestSchema = z.object({
   newPassword: z.string(),
 });
 export type ChangePasswordRequestType = z.infer<typeof changePasswordRequestSchema>;
+
+
+export const loginResponseSchema = z.object({
+    user: userReadSchema,
+    jwtToken: z.string(),
+})
+export type LoginResponseType = z.infer<typeof loginResponseSchema>;

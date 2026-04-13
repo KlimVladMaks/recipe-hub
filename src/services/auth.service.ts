@@ -1,7 +1,9 @@
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 
-import type { RegisterRequestType } from "../schemas/auth.schemas.js";
+import type { LoginRequestType, RegisterRequestType } from "../schemas/auth.schemas.js";
 import { prisma } from '../config/database.js';
+import { jwtConfig } from '../config/jwt.js';
 
 
 export class AuthService {
@@ -34,5 +36,32 @@ export class AuthService {
             },
         });
         return user;
+    }
+
+    static async login(loginRequestData: LoginRequestType) {
+        const { username, password } = loginRequestData;
+
+        const user = await prisma.user.findUnique({
+            where: { username },
+        });
+        if (!user) {
+            throw new Error('Неверное имя пользователя или пароль');
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+        if (!isPasswordValid) {
+            throw new Error('Неверное имя пользователя или пароль');
+        }
+
+        const token = jwt.sign(
+            { userId: user.id }, 
+            jwtConfig.secret, 
+            { expiresIn: jwtConfig.expiresIn } as jwt.SignOptions
+        );
+
+        return { 
+            user: user, 
+            jwtToken: token,
+        }
     }
 }
