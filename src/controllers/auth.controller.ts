@@ -10,15 +10,9 @@ export class AuthController {
         try {
             const registerRequestData: RegisterRequestType = req.body
             const user = await AuthService.register(registerRequestData)
-            const userReadData = userReadSchema.parse(user)
-            res.status(201).json({
-                success: true,
-                message: 'Пользователь успешно создан',
-                data: userReadData
-            })
+            res.status(201).json(userReadSchema.parse(user))
         } catch (error: any) {
             res.status(400).json({
-                success: false,
                 message: error.message,
             });
         }

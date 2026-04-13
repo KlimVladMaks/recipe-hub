@@ -11,6 +11,7 @@ async function startServer() {
             console.log(`
 Сервер запущен по адресу: http://localhost:${PORT}
 API: http://localhost:${PORT}/api
+Swagger: http://localhost:${PORT}/api-docs
 Проверить состояние сервера: http://localhost:${PORT}/health
             `)
         })

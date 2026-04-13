@@ -30,6 +30,7 @@ export class AuthService {
                 about: true,
                 role: true,
                 createdAt: true,
+                updatedAt: true,
             },
         });
         return user;
