@@ -57,10 +57,10 @@ docker volume rm $(docker volume ls -q)
 npx prisma migrate dev --name <название_миграции>
 npx prisma migrate dev
 
-# Запуск Prisma Studio
-npx prisma studio
-
 # Создание клиента Prisma
 # (нужно вызывать после каждого изменения `prisma/schema.prisma`)
 npx prisma generate
+
+# Запуск Prisma Studio
+npx prisma studio
 ```

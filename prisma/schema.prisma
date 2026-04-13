@@ -80,7 +80,7 @@ model Recipe {
 
 model RecipeMedia {
   id         Int        @id @default(autoincrement())
-  recipeId   Int        @map("recipe_step_id")
+  recipeId   Int        @map("recipe_id")
   sortOrder  Int        @map("sort_order")
   mediaType  MediaType  @map("media_type")
   mediaUrl   String     @map("media_url") @db.VarChar(2048)
@@ -131,32 +131,14 @@ model Ingredient {
 
 
 model RecipeIngredient {
-  id               Int      @id @default(autoincrement())
-  ingredientId     Int      @map("ingredient_id")
-  recipeId         Int      @map("recipe_id")
-  unitId           Int?     @map("unit_id")
-  quantity         Float?  
-  altUnitText      String?  @map("alt_unit_text") @db.VarChar(255)
-  preparationNote  String?  @map("preparation_note") @db.VarChar(255)
-
+  id            Int  @id @default(autoincrement())
+  ingredientId  Int  @map("ingredient_id")
+  recipeId      Int  @map("recipe_id")
+  
   ingredient  Ingredient  @relation(fields: [ingredientId], references: [id])
   recipe      Recipe      @relation(fields: [recipeId], references: [id])
-  unit        Unit?        @relation(fields: [unitId], references: [id])
 
   @@map("recipe_ingredients")
-}
-
-
-model Unit {
-  id            Int       @id @default(autoincrement())
-  title         String    @db.VarChar(255)
-  abbreviation  String?   @db.VarChar(20)
-  createdAt     DateTime  @map("created_at") @default(now())
-  updatedAt     DateTime  @map("updated_at") @updatedAt
-
-  recipeIngredients RecipeIngredient[]
-
-  @@map("units")
 }
 
 
