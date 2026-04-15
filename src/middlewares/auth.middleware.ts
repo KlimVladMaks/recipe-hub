@@ -4,7 +4,7 @@ import { jwtConfig } from '../config/jwt.js';
 
 
 export interface AuthRequest extends Request {
-    userId?: number;
+    currentUserId?: number;
 }
 
 
@@ -31,8 +31,8 @@ export const authMiddleware = (
     }
 
     try {
-        const decoded = jwt.verify(token, jwtConfig.secret) as { userId: number };
-        req.userId = decoded.userId;
+        const decoded = jwt.verify(token, jwtConfig.secret) as { currentUserId: number };
+        req.currentUserId = decoded.currentUserId;
         next();
     } catch (error) {
         res.status(401).json({ 

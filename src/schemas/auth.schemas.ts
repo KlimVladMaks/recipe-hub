@@ -1,33 +1,33 @@
 import { z } from 'zod'
-import { userReadSchema } from './user.schemas.js';
+import { UserReadSchema } from './user.schemas.js';
 
 
-export const registerRequestSchema = z.object({
+export const RegisterRequestSchema = z.object({
     username: z.string(),
     password: z.string(),
     firstName: z.string(),
     lastName: z.string(),
     about: z.string().optional()
 })
-export type RegisterRequestType = z.infer<typeof registerRequestSchema>
+export type RegisterRequestType = z.infer<typeof RegisterRequestSchema>
 
 
-export const loginRequestSchema = z.object({
+export const LoginRequestSchema = z.object({
   username: z.string(),
   password: z.string(),
 });
-export type LoginRequestType = z.infer<typeof loginRequestSchema>;
+export type LoginRequestType = z.infer<typeof LoginRequestSchema>;
 
 
-export const changePasswordRequestSchema = z.object({
+export const LoginResponseSchema = z.object({
+    user: UserReadSchema,
+    jwtToken: z.string(),
+})
+export type LoginResponseType = z.infer<typeof LoginResponseSchema>;
+
+
+export const ChangePasswordRequestSchema = z.object({
   oldPassword: z.string(),
   newPassword: z.string(),
 });
-export type ChangePasswordRequestType = z.infer<typeof changePasswordRequestSchema>;
-
-
-export const loginResponseSchema = z.object({
-    user: userReadSchema,
-    jwtToken: z.string(),
-})
-export type LoginResponseType = z.infer<typeof loginResponseSchema>;
+export type ChangePasswordRequestType = z.infer<typeof ChangePasswordRequestSchema>;

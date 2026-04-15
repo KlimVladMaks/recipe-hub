@@ -1,7 +1,7 @@
 import express from 'express'
 import swaggerUi from 'swagger-ui-express'
 
-import router from './routes.js'
+import router from './routes/index.js'
 import { swaggerSpec } from './swagger.js'
 
 

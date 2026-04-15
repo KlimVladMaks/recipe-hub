@@ -1,9 +1,9 @@
 import type { Request, Response } from 'express'
 
-import { loginResponseSchema } from '../schemas/auth.schemas.js'
+import { LoginResponseSchema } from '../schemas/auth.schemas.js'
 import type { ChangePasswordRequestType, LoginRequestType, RegisterRequestType } from '../schemas/auth.schemas.js'
 import { AuthService } from '../services/auth.service.js'
-import { userReadSchema } from '../schemas/user.schemas.js'
+import { UserReadSchema } from '../schemas/user.schemas.js'
 import type { AuthRequest } from '../middlewares/auth.middleware.js'
 
 
@@ -12,38 +12,36 @@ export class AuthController {
         try {
             const registerRequestData: RegisterRequestType = req.body
             const user = await AuthService.register(registerRequestData)
-            res.status(201).json(userReadSchema.parse(user))
+            res.status(201).json(UserReadSchema.parse(user))
         } catch (error: any) {
             res.status(400).json({
                 message: error.message,
             });
-        }
-    }
+        };
+    };
 
     static async login(req: Request, res: Response) {
         try {
             const loginRequestData: LoginRequestType = req.body
             const result = await AuthService.login(loginRequestData);
-            res.status(200).json(loginResponseSchema.parse(result))
+            res.status(200).json(LoginResponseSchema.parse(result))
         } catch (error: any) {
             res.status(400).json({
                 message: error.message,
             });
-        }
-    }
+        };
+    };
 
     static async changePassword(req: AuthRequest, res: Response) {
         try {
+            const currentUserId = req.currentUserId!;
             const { oldPassword, newPassword }: ChangePasswordRequestType = req.body;
-            const userId = req.userId!;
-            await AuthService.changePassword(userId, oldPassword, newPassword);
-            res.status(200).json({
-                message: "Пароль успешно изменён"
-            })
+            await AuthService.changePassword(currentUserId, oldPassword, newPassword);
+            res.status(200)
         } catch (error: any) {
             res.status(400).json({
                 message: error.message,
             });
-        }
-    }
-}
+        };
+    };
+};

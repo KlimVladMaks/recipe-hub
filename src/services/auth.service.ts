@@ -36,7 +36,7 @@ export class AuthService {
             },
         });
         return user;
-    }
+    };
 
     static async login(loginRequestData: LoginRequestType) {
         const { username, password } = loginRequestData;
@@ -63,7 +63,7 @@ export class AuthService {
             user: user, 
             jwtToken: token,
         }
-    }
+    };
 
     static async changePassword(userId: number, oldPassword: string, newPassword: string) {
         const user = await prisma.user.findUnique({
@@ -85,5 +85,5 @@ export class AuthService {
         });
 
         return;
-    }
-}
+    };
+};
