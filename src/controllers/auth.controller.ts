@@ -35,8 +35,8 @@ export class AuthController {
     static async changePassword(req: AuthRequest, res: Response) {
         try {
             const currentUserId = req.currentUserId!;
-            const { oldPassword, newPassword }: ChangePasswordRequestType = req.body;
-            await AuthService.changePassword(currentUserId, oldPassword, newPassword);
+            const changePasswordRequestData: ChangePasswordRequestType = req.body;
+            await AuthService.changePassword(currentUserId, changePasswordRequestData);
             res.status(200)
         } catch (error: any) {
             res.status(400).json({

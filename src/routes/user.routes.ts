@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import validate from 'express-zod-safe'
-
 import { authMiddleware } from '../middlewares/auth.middleware.js'
 import { 
     UserUpdateSchema,
     UserRoleUpdateSchema,
  } from '../schemas/user.schemas.js';
 import { UserController } from '../controllers/user.controller.js';
+import z from 'zod';
 
 const userRouter = Router();
 
@@ -33,19 +33,22 @@ userRouter.delete('/users/me',
     UserController.deleteCurrentUsers,
 );
 
-userRouter.get('/users/:userId(\\d+)',
+userRouter.get('/users/:userId',
     authMiddleware,
     UserController.getUser,
 );
 
-userRouter.delete('/users/:userId(\\d+)',
+userRouter.delete('/users/:userId',
     authMiddleware,
     UserController.deleteUser,
 );
 
-userRouter.patch('/users/:userId(\\d+)/role',
+userRouter.patch('/users/:userId/role',
     authMiddleware,
     validate({
+        params: {
+            userId: z.string()
+        },
         body: UserRoleUpdateSchema
     }),
     UserController.updateUserRole,

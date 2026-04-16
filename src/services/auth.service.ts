@@ -1,9 +1,14 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
-import type { LoginRequestType, RegisterRequestType } from "../schemas/auth.schemas.js";
+import { 
+    type ChangePasswordRequestType, 
+    type LoginRequestType, 
+    type RegisterRequestType 
+} from "../schemas/auth.schemas.js";
 import { prisma } from '../config/database.js';
 import { jwtConfig } from '../config/jwt.js';
+import { Role } from '@prisma/client';
 
 
 export class AuthService {
@@ -23,16 +28,6 @@ export class AuthService {
                 firstName,
                 lastName,
                 about: about || null
-            },
-            select: {
-                id: true,
-                username: true,
-                firstName: true,
-                lastName: true,
-                about: true,
-                role: true,
-                createdAt: true,
-                updatedAt: true,
             },
         });
         return user;
@@ -54,7 +49,7 @@ export class AuthService {
         }
 
         const token = jwt.sign(
-            { userId: user.id }, 
+            { currentUserId: user.id }, 
             jwtConfig.secret, 
             { expiresIn: jwtConfig.expiresIn } as jwt.SignOptions
         );
@@ -65,7 +60,8 @@ export class AuthService {
         }
     };
 
-    static async changePassword(userId: number, oldPassword: string, newPassword: string) {
+    static async changePassword(userId: number, changePasswordRequestData: ChangePasswordRequestType) {
+        const { oldPassword, newPassword } = changePasswordRequestData;
         const user = await prisma.user.findUnique({
             where: { id: userId },
         });
@@ -86,4 +82,14 @@ export class AuthService {
 
         return;
     };
+
+    static async isUserAdmin(userId: number) {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+        });
+        if (!user) {
+            throw new Error('Пользователь не найден');
+        }
+        return user.role === Role.admin;
+    }
 };

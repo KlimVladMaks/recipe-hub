@@ -10,7 +10,7 @@ export const UserReadSchema = z.object({
     role: z.string(),
     createdAt: z.date(),
     updatedAt: z.date(),
-})
+});
 export type UserReadType = z.infer<typeof UserReadSchema>;
 
 
