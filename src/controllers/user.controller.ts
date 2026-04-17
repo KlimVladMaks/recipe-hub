@@ -95,7 +95,7 @@ export class UserController {
             const { userId:userIdStr } = req.params;
             const userId = parseInt(userIdStr as string);
             await UserService.deleteUser(userId);
-            res.status(204);
+            res.status(204).send();
         } catch (error: any) {
             res.status(400).json({
                 message: error.message,

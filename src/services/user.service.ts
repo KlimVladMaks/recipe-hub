@@ -38,6 +38,12 @@ export class UserService {
     };
 
     static async deleteUser(userId: number) {
+        const user = await prisma.user.findUnique({
+            where: { id: userId }
+        });
+        if (!user) {
+            throw new Error('Пользователь не найден');
+        }
         await prisma.user.delete({ 
             where: { id: userId } 
         });

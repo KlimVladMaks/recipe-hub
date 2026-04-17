@@ -88,7 +88,7 @@ export class AuthService {
             where: { id: userId },
         });
         if (!user) {
-            throw new Error('Пользователь не найден');
+            throw new Error('isUserAdmin: Пользователь не найден');
         }
         return user.role === Role.admin;
     }
