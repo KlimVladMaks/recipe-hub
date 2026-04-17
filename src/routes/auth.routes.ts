@@ -8,6 +8,11 @@ import {
 } from '../schemas/auth.schemas.js'
 import { AuthController } from '../controllers/auth.controller.js'
 import { authMiddleware } from '../middlewares/auth.middleware.js'
+import { setGlobalOptions } from 'express-zod-safe';
+
+setGlobalOptions({
+    missingSchemaBehavior: 'any'
+});
 
 const authRouter = Router()
 

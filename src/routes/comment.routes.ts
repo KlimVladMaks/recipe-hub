@@ -2,20 +2,20 @@ import { Router } from 'express';
 
 const commentRouter = Router();
 
-commentRouter.get('/recipes/:recipeId(\\d+)/comments');
+// commentRouter.get('/recipes/:recipeId/comments');
 
-commentRouter.post('/recipes/:recipeId(\\d+)/comments');
+// commentRouter.post('/recipes/:recipeId/comments');
 
-commentRouter.get('/recipes/:recipeId(\\d+)/comments/:commentId(\\d+)');
+// commentRouter.get('/recipes/:recipeId/comments/:commentId');
 
-commentRouter.patch('/recipes/:recipeId(\\d+)/comments/:commentId(\\d+)');
+// commentRouter.patch('/recipes/:recipeId/comments/:commentId');
 
-commentRouter.delete('/recipes/:recipeId(\\d+)/comments/:commentId(\\d+)');
+// commentRouter.delete('/recipes/:recipeId/comments/:commentId');
 
-commentRouter.get('/recipes/:recipeId(\\d+)/comments/:commentId(\\d+)/like');
+// commentRouter.get('/recipes/:recipeId/comments/:commentId/like');
 
-commentRouter.post('/recipes/:recipeId(\\d+)/comments/:commentId(\\d+)/like');
+// commentRouter.post('/recipes/:recipeId/comments/:commentId/like');
 
-commentRouter.delete('/recipes/:recipeId(\\d+)/comments/:commentId(\\d+)/like');
+// commentRouter.delete('/recipes/:recipeId/comments/:commentId/like');
 
 export default commentRouter;

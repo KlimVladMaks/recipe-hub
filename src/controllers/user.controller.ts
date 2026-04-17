@@ -1,5 +1,4 @@
 import type { Response } from 'express'
-
 import type { AuthRequest } from "../middlewares/auth.middleware.js";
 import { AuthService } from '../services/auth.service.js';
 import { UserService } from '../services/user.service.js';

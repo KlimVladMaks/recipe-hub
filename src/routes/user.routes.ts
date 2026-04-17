@@ -6,7 +6,11 @@ import {
     UserRoleUpdateSchema,
  } from '../schemas/user.schemas.js';
 import { UserController } from '../controllers/user.controller.js';
-import z from 'zod';
+import { setGlobalOptions } from 'express-zod-safe';
+
+setGlobalOptions({
+    missingSchemaBehavior: 'any'
+});
 
 const userRouter = Router();
 
@@ -46,9 +50,6 @@ userRouter.delete('/users/:userId',
 userRouter.patch('/users/:userId/role',
     authMiddleware,
     validate({
-        params: {
-            userId: z.string()
-        },
         body: UserRoleUpdateSchema
     }),
     UserController.updateUserRole,
