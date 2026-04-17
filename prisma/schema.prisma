@@ -56,14 +56,14 @@ model User {
 
 
 model Recipe { 
-  id           Int         @id @default(autoincrement())
-  authorId     Int         @map("author_id")
-  title        String      @db.VarChar(255)
-  description  String?     @db.Text
-  difficulty   Difficulty
-  createdAt    DateTime    @map("created_at") @default(now())
-  updatedAt    DateTime    @map("updated_at") @updatedAt
-  isPublished  Boolean     @map("is_published") @default(false)
+  id           Int          @id @default(autoincrement())
+  authorId     Int          @map("author_id")
+  title        String       @db.VarChar(255)
+  description  String?      @db.Text
+  difficulty   Difficulty?
+  createdAt    DateTime     @map("created_at") @default(now())
+  updatedAt    DateTime     @map("updated_at") @updatedAt
+  isPublished  Boolean      @map("is_published") @default(false)
 
   author             User                @relation(fields: [authorId], references: [id])
   recipeDishTypes    RecipeDishType[]
