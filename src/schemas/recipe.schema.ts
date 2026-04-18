@@ -19,8 +19,10 @@ export const RecipeMediaReadSchema = z.object({
 });
 export type RecipeMediaReadType = z.infer<typeof RecipeMediaReadSchema>;
 
+
 export const RecipeMediaReadListSchema = z.array(RecipeMediaReadSchema);
 export type RecipeMediaReadListType = z.infer<typeof RecipeMediaReadListSchema>;
+
 
 export const RecipeMediaCreateSchema = z.object({
     sortOrder: z.number(),
@@ -29,8 +31,10 @@ export const RecipeMediaCreateSchema = z.object({
 });
 export type RecipeMediaCreateType = z.infer<typeof RecipeMediaCreateSchema>;
 
+
 export const RecipeMediaCreateListSchema = z.array(RecipeMediaCreateSchema);
 export type RecipeMediaCreateListType = z.infer<typeof RecipeMediaCreateListSchema>;
+
 
 export const RecipeMediaUpdateSchema = z.object({
     sortOrder: z.number().optional(),
@@ -39,8 +43,10 @@ export const RecipeMediaUpdateSchema = z.object({
 });
 export type RecipeMediaUpdateType = z.infer<typeof RecipeMediaUpdateSchema>;
 
+
 export const RecipeMediaUpdateListSchema = z.array(RecipeMediaUpdateSchema);
 export type RecipeMediaUpdateListType = z.infer<typeof RecipeMediaUpdateListSchema>;
+
 
 // ========== StepMedia ==========
 
@@ -55,8 +61,10 @@ export const StepMediaReadSchema = z.object({
 });
 export type StepMediaReadType = z.infer<typeof StepMediaReadSchema>;
 
+
 export const StepMediaReadListSchema = z.array(StepMediaReadSchema);
 export type StepMediaReadListType = z.infer<typeof StepMediaReadListSchema>;
+
 
 export const StepMediaCreateSchema = z.object({
     sortOrder: z.number(),
@@ -65,8 +73,10 @@ export const StepMediaCreateSchema = z.object({
 });
 export type StepMediaCreateType = z.infer<typeof StepMediaCreateSchema>;
 
+
 export const StepMediaCreateListSchema = z.array(StepMediaCreateSchema);
 export type StepMediaCreateListType = z.infer<typeof StepMediaCreateListSchema>;
+
 
 export const StepMediaUpdateSchema = z.object({
     sortOrder: z.number().optional(),
@@ -75,8 +85,10 @@ export const StepMediaUpdateSchema = z.object({
 });
 export type StepMediaUpdateType = z.infer<typeof StepMediaUpdateSchema>;
 
+
 export const StepMediaUpdateListSchema = z.array(StepMediaUpdateSchema);
 export type StepMediaUpdateListType = z.infer<typeof StepMediaUpdateListSchema>;
+
 
 // ========== Step ==========
 
@@ -92,8 +104,10 @@ export const StepReadSchema = z.object({
 });
 export type StepReadType = z.infer<typeof StepReadSchema>;
 
+
 export const StepReadListSchema = z.array(StepReadSchema);
 export type StepReadListType = z.infer<typeof StepReadListSchema>;
+
 
 export const StepCreateSchema = z.object({
     number: z.number(),
@@ -103,6 +117,7 @@ export const StepCreateSchema = z.object({
 });
 export type StepCreateType = z.infer<typeof StepCreateSchema>;
 
+
 export const StepUpdateSchema = z.object({
     number: z.number().optional(),
     title: z.string().optional(),
@@ -110,6 +125,7 @@ export const StepUpdateSchema = z.object({
     description: z.string().nullable().optional(),
 });
 export type StepUpdateType = z.infer<typeof StepUpdateSchema>;
+
 
 // ========== Recipe ==========
 
@@ -130,8 +146,10 @@ export const RecipeReadSchema = z.object({
 });
 export type RecipeReadType = z.infer<typeof RecipeReadSchema>;
 
+
 export const RecipeReadListSchema = z.array(RecipeReadSchema);
 export type RecipeReadListType = z.infer<typeof RecipeReadListSchema>;
+
 
 export const RecipeCreateSchema = z.object({
     title: z.string(),
@@ -144,6 +162,7 @@ export const RecipeCreateSchema = z.object({
 });
 export type RecipeCreateType = z.infer<typeof RecipeCreateSchema>;
 
+
 export const RecipeUpdateSchema = z.object({
     title: z.string().optional(),
     dishTypeIds: z.array(z.number()).optional(),
@@ -155,6 +174,7 @@ export const RecipeUpdateSchema = z.object({
 });
 export type RecipeUpdateType = z.infer<typeof RecipeUpdateSchema>;
 
+
 // ========== RecipeRating ==========
 
 
@@ -164,10 +184,12 @@ export const RecipeRatingReadSchema = z.object({
 });
 export type RecipeRatingReadType = z.infer<typeof RecipeRatingReadSchema>;
 
+
 export const RecipeRatingPutSchema = z.object({
     rating: z.number(),
 });
 export type RecipeRatingPutType = z.infer<typeof RecipeRatingPutSchema>;
+
 
 // ========== SavedRecipe ==========
 

@@ -1,7 +1,13 @@
 import { Router } from 'express'
 import validate, { setGlobalOptions } from 'express-zod-safe';
-import { authMiddleware } from '../middlewares/auth.middleware.js';
+import { authMiddleware, isAdmin as isAdmin, isRecipeAuthor, isRecipeAuthorOrAdmin } from '../middlewares/auth.middleware.js';
 import { RecipeController } from '../controllers/recipe.controller.js';
+import { 
+    RecipeCreateSchema, 
+    RecipeRatingPutSchema, 
+    RecipeUpdateSchema, 
+} from '../schemas/recipe.schema.js';
+
 
 setGlobalOptions({
     missingSchemaBehavior: 'any'
@@ -49,6 +55,7 @@ recipeRouter.get('/recipes/:recipeId',
 
 recipeRouter.patch('/recipes/:recipeId',
     authMiddleware,
+    isRecipeAuthor,
     validate({
         body: RecipeUpdateSchema
     }),
@@ -56,101 +63,9 @@ recipeRouter.patch('/recipes/:recipeId',
 );
 
 recipeRouter.delete('/recipes/:recipeId',
+    isRecipeAuthorOrAdmin,
     authMiddleware,
     RecipeController.deleteRecipe
-);
-
-recipeRouter.get('/recipes/:recipeId/media',
-    authMiddleware,
-    RecipeController.getRecipeMedias
-);
-
-recipeRouter.post('/recipes/:recipeId/media',
-    authMiddleware,
-    validate({
-        body: RecipeMediaCreateSchema
-    }),
-    RecipeController.addRecipeMedia
-);
-
-recipeRouter.get('/recipes/:recipeId/media/:recipeMediaId',
-    authMiddleware,
-    RecipeController.getRecipeMedia
-);
-
-recipeRouter.patch('/recipes/:recipeId/media/:recipeMediaId',
-    authMiddleware,
-    validate({
-        body: RecipeMediaUpdateSchema
-    }),
-    RecipeController.updateRecipeMedia
-);
-
-recipeRouter.delete('/recipes/:recipeId/media/:recipeMediaId',
-    authMiddleware,
-    RecipeController.deleteRecipeMedia
-);
-
-recipeRouter.get('/recipes/:recipeId/steps',
-    authMiddleware,
-    RecipeController.getRecipeSteps
-);
-
-recipeRouter.post('/recipes/:recipeId/steps',
-    authMiddleware,
-    RecipeController.addRecipeStep
-);
-
-recipeRouter.get('/recipes/:recipeId/steps/:stepId',
-    authMiddleware,
-    validate({
-        body: StepCreateSchema
-    }),
-    RecipeController.getRecipeStep
-);
-
-recipeRouter.patch('/recipes/:recipeId/steps/:stepId',
-    authMiddleware,
-    validate({
-        body: StepUpdateSchema
-    }),
-    RecipeController.updateRecipeStep
-);
-
-recipeRouter.delete('/recipes/:recipeId/steps/:stepId',
-    authMiddleware,
-    RecipeController.deleteRecipeStep
-);
-
-recipeRouter.get('/recipes/:recipeId/steps/:stepId/media',
-    authMiddleware,
-    RecipeController.getStepMedias
-);
-
-recipeRouter.post('/recipes/:recipeId/steps/:stepId/media',
-    authMiddleware,
-    validate({
-        body: StepMediaCreateSchema
-    }),
-    RecipeController.addStepMedia
-);
-
-recipeRouter.get('/recipes/:recipeId/steps/:stepId/media/:stepMediaId',
-    authMiddleware,
-    RecipeController.getStepMedia
-);
-
-recipeRouter.patch('/recipes/:recipeId/steps/:stepId/media/:stepMediaId',
-    authMiddleware,
-    validate({
-        body: StepMediaUpdateSchema
-    }),
-    RecipeController.updateStepMedia
-);
-
-recipeRouter.delete('/recipes/:recipeId/steps/:stepId/media/:stepMediaId',
-    authMiddleware,
-    RecipeController.deleteStepMedia
 );
 
 recipeRouter.get('/recipes/:recipeId/rating',
@@ -163,7 +78,7 @@ recipeRouter.put('/recipes/:recipeId/rating',
     validate({
         body: RecipeRatingPutSchema
     }),
-    RecipeController.addRecipeRating
+    RecipeController.putRecipeRating
 );
 
 recipeRouter.delete('/recipes/:recipeId/rating',

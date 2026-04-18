@@ -377,382 +377,6 @@ paths:
         204:
           description: Рецепт удалён
   
-  /recipes/{recipeId}/media:
-    get:
-      tags: [Recipe]
-      summary: Получить список медиа рецепта
-      security:
-        - JWTAuth: []
-      parameters:
-        - name: recipeId
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        200:
-          description: Список медиа рецепта
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RecipeMediaReadList'
-    post:
-      tags: [Recipe]
-      summary: Добавить медиа рецепта (только автор)
-      security:
-        - JWTAuth: []
-      parameters:
-        - name: recipeId
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RecipeMediaCreate'
-      responses:
-        201:
-          description: Медиа рецепта добавлено
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RecipeMediaRead'
-  
-  /recipes/{recipeId}/media/{recipeMediaId}:
-    get:
-      tags: [Recipe]
-      summary: Получить медиа рецепта
-      security:
-        - JWTAuth: []
-      parameters:
-        - name: recipeId
-          in: path
-          required: true
-          schema:
-            type: integer
-        - name: recipeMediaId
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        200:
-          description: Медиа рецепта
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RecipeMediaRead'
-    patch:
-      tags: [Recipe]
-      summary: Изменить медиа рецепта (только автор)
-      security:
-        - JWTAuth: []
-      parameters:
-        - name: recipeId
-          in: path
-          required: true
-          schema:
-            type: integer
-        - name: recipeMediaId
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RecipeMediaUpdate'
-      responses:
-        200:
-          description: Медиа рецепта изменено
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RecipeMediaRead'
-    delete:
-      tags: [Recipe]
-      summary: Удалить медиа рецепта (только автор)
-      security:
-        - JWTAuth: []
-      parameters:
-        - name: recipeId
-          in: path
-          required: true
-          schema:
-            type: integer
-        - name: recipeMediaId
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        204:
-          description: Медиа рецепта удалено
-          
-  /recipes/{recipeId}/steps:
-    get:
-      tags: [Recipe]
-      summary: Получить список шагов рецепта
-      security:
-        - JWTAuth: []
-      parameters:
-        - name: recipeId
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        200:
-          description: Список шагов рецепта
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StepReadList'
-    post:
-      tags: [Recipe]
-      summary: Добавить шаг к рецепту (только автор)
-      security:
-        - JWTAuth: []
-      parameters:
-        - name: recipeId
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/StepCreate'
-      responses:
-        201:
-          description: Шаг рецепта добавлен
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StepRead'
-
-  /recipes/{recipeId}/steps/{stepId}:
-    get:
-      tags: [Recipe]
-      summary: Получить шаг рецепта
-      security:
-        - JWTAuth: []
-      parameters:
-        - name: recipeId
-          in: path
-          required: true
-          schema:
-            type: integer
-        - name: stepId
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        200:
-          description: Шаг рецепта
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StepRead'
-    patch:
-      tags: [Recipe]
-      summary: Изменить шаг рецепта (только автор)
-      security:
-        - JWTAuth: []
-      parameters:
-        - name: recipeId
-          in: path
-          required: true
-          schema:
-            type: integer
-        - name: stepId
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/StepUpdate'
-      responses:
-        200:
-          description: Шаг рецепта изменён
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StepRead'
-    delete:
-      tags: [Recipe]
-      summary: Удалить шаг рецепта (только автор)
-      security:
-        - JWTAuth: []
-      parameters:
-        - name: recipeId
-          in: path
-          required: true
-          schema:
-            type: integer
-        - name: stepId
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        204:
-          description: Шаг рецепта удалён
-  
-  /recipes/{recipeId}/steps/{stepId}/media:
-    get:
-      tags: [Recipe]
-      summary: Получить список медиа для шага рецепта
-      security:
-        - JWTAuth: []
-      parameters:
-        - name: recipeId
-          in: path
-          required: true
-          schema:
-            type: integer
-        - name: stepId
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        200:
-          description: Список медиа для шага рецепта
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StepMediaReadList'
-    post:
-      tags: [Recipe]
-      summary: Добавить медиа для шага рецепта (только автор)
-      security:
-        - JWTAuth: []
-      parameters:
-        - name: recipeId
-          in: path
-          required: true
-          schema:
-            type: integer
-        - name: stepId
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/StepMediaCreate'
-      responses:
-        201:
-          description: Медиа для шага рецепта добавлено
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StepMediaRead'
-  
-  /recipes/{recipeId}/steps/{stepId}/media/{stepMediaId}:
-    get:
-      tags: [Recipe]
-      summary: Получить медиа для шага рецепта
-      security:
-        - JWTAuth: []
-      parameters:
-        - name: recipeId
-          in: path
-          required: true
-          schema:
-            type: integer
-        - name: stepId
-          in: path
-          required: true
-          schema:
-            type: integer
-        - name: stepMediaId
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        200:
-          description: Медиа для шага рецепта
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StepMediaRead'
-    patch:
-      tags: [Recipe]
-      summary: Изменить медиа для шага рецепта (только автор)
-      security:
-        - JWTAuth: []
-      parameters:
-        - name: recipeId
-          in: path
-          required: true
-          schema:
-            type: integer
-        - name: stepId
-          in: path
-          required: true
-          schema:
-            type: integer
-        - name: stepMediaId
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/StepMediaUpdate'
-      responses:
-        200:
-          description: Медиа для шага рецепта изменено
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StepMediaRead'
-    delete:
-      tags: [Recipe]
-      summary: Удалить медиа для шага рецепта (только автор)
-      security:
-        - JWTAuth: []
-      parameters:
-        - name: recipeId
-          in: path
-          required: true
-          schema:
-            type: integer
-        - name: stepId
-          in: path
-          required: true
-          schema:
-            type: integer
-        - name: stepMediaId
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        204:
-          description: Медиа для шага рецепта удалено
-  
   /recipes/{recipeId}/rating:
     get:
       tags: [Recipe]
@@ -858,6 +482,125 @@ paths:
       responses:
         204:
           description: Сохранение рецепта отменено
+  
+  # ==================== Step ====================
+   
+  /recipes/{recipeId}/steps:
+    get:
+      tags: [Step]
+      summary: Получить список шагов рецепта
+      security:
+        - JWTAuth: []
+      parameters:
+        - name: recipeId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        200:
+          description: Список шагов рецепта
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StepReadList'
+    post:
+      tags: [Step]
+      summary: Добавить шаг к рецепту (только автор)
+      security:
+        - JWTAuth: []
+      parameters:
+        - name: recipeId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StepCreate'
+      responses:
+        201:
+          description: Шаг рецепта добавлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StepRead'
+
+  /recipes/{recipeId}/steps/{stepId}:
+    get:
+      tags: [Step]
+      summary: Получить шаг рецепта
+      security:
+        - JWTAuth: []
+      parameters:
+        - name: recipeId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: stepId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        200:
+          description: Шаг рецепта
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StepRead'
+    patch:
+      tags: [Step]
+      summary: Изменить шаг рецепта (только автор)
+      security:
+        - JWTAuth: []
+      parameters:
+        - name: recipeId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: stepId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StepUpdate'
+      responses:
+        200:
+          description: Шаг рецепта изменён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StepRead'
+    delete:
+      tags: [Step]
+      summary: Удалить шаг рецепта (только автор)
+      security:
+        - JWTAuth: []
+      parameters:
+        - name: recipeId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: stepId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        204:
+          description: Шаг рецепта удалён
   
   # ==================== Directory ====================
   
@@ -1698,6 +1441,33 @@ components:
       items:
         $ref: '#/components/schemas/RecipeMediaUpdate'
     
+    # ---------- RecipeRating ----------
+    
+    RecipeRatingRead:
+      type: object
+      properties:
+        avg_rating:
+          type: number
+        rating_by_user:
+          type: integer
+    
+    RecipeRatingPut:
+      type: object
+      required: [rating]
+      properties:
+        rating:
+          type: integer
+    
+    # ---------- SavedRecipe ----------
+    
+    IsRecipeSavedRead:
+      type: object
+      properties:
+        isSaved:
+          type: boolean
+    
+    # ==================== Step ====================
+    
     # ---------- Step ----------
     
     StepRead:
@@ -1806,31 +1576,6 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/StepMediaUpdate'
-    
-    # ---------- RecipeRating ----------
-    
-    RecipeRatingRead:
-      type: object
-      properties:
-        avg_rating:
-          type: number
-        rating_by_user:
-          type: integer
-    
-    RecipeRatingPut:
-      type: object
-      required: [rating]
-      properties:
-        rating:
-          type: integer
-    
-    # ---------- SavedRecipe ----------
-    
-    IsRecipeSavedRead:
-      type: object
-      properties:
-        isSaved:
-          type: boolean
     
     # ==================== Directory ====================
     

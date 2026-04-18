@@ -1,6 +1,8 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { jwtConfig } from '../config/jwt.js';
+import { RecipeService } from '../services/recipe.service.js';
+import { AuthService } from '../services/auth.service.js';
 
 
 export interface AuthRequest extends Request {
@@ -39,4 +41,49 @@ export const authMiddleware = (
             message: 'Недействительный JWT-токен' 
         });
     }
-}
+};
+
+
+export const isAdmin = (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+) => {
+
+};
+
+
+export const isRecipeAuthor = (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+) => {
+    const currentUserId = req.currentUserId;
+    const { recipeId:recipeIdStr } = req.params;
+    const recipeId = parseInt(recipeIdStr as string);
+    if (!RecipeService.isUserRecipeAuthor(currentUserId, recipeId)) {
+        res.status(403).json({
+            message: "Доступ только для автора рецепта"
+        });
+        return;
+    }
+    next();
+};
+
+
+export const isRecipeAuthorOrAdmin = (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+) => {
+    const currentUserId = req.currentUserId;
+    const { recipeId:recipeIdStr } = req.params;
+    const recipeId = parseInt(recipeIdStr as string);
+    if (!(RecipeService.isUserRecipeAuthor(currentUserId, recipeId) || AuthService.isUserAdmin(currentUserId))) {
+        res.status(403).json({
+            message: "Доступ только для автора рецепта и администраторов"
+        })
+        return;
+    };
+    next();
+};
