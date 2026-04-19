@@ -1312,8 +1312,6 @@ components:
           $ref: '#/components/schemas/DishTypeReadList'
         ingredients:
           $ref: '#/components/schemas/IngredientReadList'
-        avg_rating:
-          type: number
         description:
           type: string
         media:

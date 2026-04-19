@@ -12,8 +12,8 @@ import { UserReadSchema } from './user.schemas.js';
 export const RecipeMediaReadSchema = z.object({
     id: z.number(),
     sortOrder: z.number(),
-    mediaType: z.number(),
-    mediaUrl: z.number(),
+    mediaType: z.string(),
+    mediaUrl: z.string(),
     createdAt: z.date(),
     updatedAt: z.date(),
 });
@@ -135,7 +135,6 @@ export const RecipeReadSchema = z.object({
     title: z.string(),
     dishTypes: DishTypeReadListSchema,
     ingredients: IngredientReadListSchema,
-    avg_rating: z.number().nullable().optional(),
     description: z.string().nullable().optional(),
     media: RecipeMediaReadListSchema,
     difficulty: z.string().nullable().optional(),
@@ -168,7 +167,7 @@ export const RecipeUpdateSchema = z.object({
     dishTypeIds: z.array(z.number()).optional(),
     ingredientIds: z.array(z.number()).optional(),
     description: z.string().optional(),
-    media: RecipeMediaCreateListSchema.optional(),
+    media: RecipeMediaUpdateListSchema.optional(),
     difficulty: z.string().optional(),
     isPublished: z.boolean().optional(),
 });

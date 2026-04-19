@@ -14,7 +14,7 @@ import type { Difficulty } from '@prisma/client';
 
 
 export class RecipeController {
-    static parseQueryParams(req: AuthRequest) {
+    private static parseQueryParams(req: AuthRequest) {
         const { 
                 page:pageStr='1', 
                 limit:limitStr='20',
