@@ -65,7 +65,7 @@ model Recipe {
   updatedAt    DateTime     @map("updated_at") @updatedAt
   isPublished  Boolean      @map("is_published") @default(false)
 
-  author             User                @relation(fields: [authorId], references: [id])
+  author             User                @relation(fields: [authorId], references: [id], onDelete: Cascade)
   recipeDishTypes    RecipeDishType[]
   savedBy            SavedRecipe[]
   comments           Comment[]
@@ -87,7 +87,7 @@ model RecipeMedia {
   createdAt  DateTime   @map("created_at") @default(now())
   updatedAt  DateTime   @map("updated_at") @updatedAt
 
-  recipe Recipe @relation(fields: [recipeId], references: [id])
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
 
   @@map("recipe_media")
 }
@@ -110,8 +110,8 @@ model RecipeDishType {
   dishTypeId  Int  @map("dish_type_id")
   recipeId    Int  @map("recipe_id")
 
-  dishType  DishType  @relation(fields: [dishTypeId], references: [id])
-  recipe    Recipe    @relation(fields: [recipeId], references: [id])
+  dishType  DishType  @relation(fields: [dishTypeId], references: [id], onDelete: Cascade)
+  recipe    Recipe    @relation(fields: [recipeId], references: [id], onDelete: Cascade)
 
   @@unique([dishTypeId, recipeId])
   @@map("recipe_dish_types")
@@ -135,8 +135,8 @@ model RecipeIngredient {
   ingredientId  Int  @map("ingredient_id")
   recipeId      Int  @map("recipe_id")
   
-  ingredient  Ingredient  @relation(fields: [ingredientId], references: [id])
-  recipe      Recipe      @relation(fields: [recipeId], references: [id])
+  ingredient  Ingredient  @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  recipe      Recipe      @relation(fields: [recipeId], references: [id], onDelete: Cascade)
 
   @@map("recipe_ingredients")
 }
@@ -151,7 +151,7 @@ model RecipeStep {
   createdAt    DateTime  @map("created_at") @default(now())
   updatedAt    DateTime  @map("updated_at") @updatedAt
 
-  recipe  Recipe             @relation(fields: [recipeId], references: [id])
+  recipe  Recipe             @relation(fields: [recipeId], references: [id], onDelete: Cascade)
   media   RecipeStepMedia[]
 
   @@map("recipe_steps")
@@ -167,7 +167,7 @@ model RecipeStepMedia {
   createdAt     DateTime   @map("created_at") @default(now())
   updatedAt     DateTime   @map("updated_at") @updatedAt
 
-  recipeStep RecipeStep @relation(fields: [recipeStepId], references: [id])
+  recipeStep RecipeStep @relation(fields: [recipeStepId], references: [id], onDelete: Cascade)
 
   @@map("recipe_step_media")
 }
@@ -179,8 +179,8 @@ model SavedRecipe {
   recipeId  Int       @map("recipe_id")
   savedAt   DateTime  @map("saved_at") @default(now())
 
-  user    User    @relation(fields: [userId], references: [id])
-  recipe  Recipe  @relation(fields: [recipeId], references: [id])
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipe  Recipe  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, recipeId])
   @@map("saved_recipes")
@@ -191,15 +191,12 @@ model Comment {
   id         Int       @id @default(autoincrement())
   userId     Int       @map("user_id")
   recipeId   Int       @map("recipe_id")
-  parentId   Int?      @map("parent_id")
   text       String    @db.Text
   createdAt  DateTime  @map("created_at") @default(now())
   updatedAt  DateTime  @map("updated_at") @updatedAt
 
-  user     User           @relation(fields: [userId], references: [id])
-  recipe   Recipe         @relation(fields: [recipeId], references: [id])
-  parent   Comment?       @relation("CommentToComment", fields: [parentId], references: [id])
-  replies  Comment[]      @relation("CommentToComment")
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipe   Recipe         @relation(fields: [recipeId], references: [id], onDelete: Cascade)
   likes    CommentLike[]
 
   @@map("comments")
@@ -212,8 +209,8 @@ model CommentLike {
   commentId  Int       @map("comment_id")
   likedAt    DateTime  @map("liked_at") @default(now())
 
-  user     User     @relation(fields: [userId], references: [id])
-  comment  Comment  @relation(fields: [commentId], references: [id])
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment  Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
 
   @@unique([userId, commentId])
   @@map("comment_likes")
@@ -227,8 +224,8 @@ model RecipeRating {
   rating    Int  
   ratedAt   DateTime  @map("rated_at") @default(now())
 
-  user    User    @relation(fields: [userId], references: [id])
-  recipe  Recipe  @relation(fields: [recipeId], references: [id])
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipe  Recipe  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, recipeId])
   @@map("recipe_ratings")
@@ -241,8 +238,8 @@ model Subscription {
   subscribedToId  Int       @map("subscribed_to_id")
   subscribedAt    DateTime  @map("subscribed_at") @default(now())
 
-  subscriber    User  @relation("subscriber", fields: [subscriberId], references: [id])
-  subscribedTo  User  @relation("subscribedTo", fields: [subscribedToId], references: [id])
+  subscriber    User  @relation("subscriber", fields: [subscriberId], references: [id], onDelete: Cascade)
+  subscribedTo  User  @relation("subscribedTo", fields: [subscribedToId], references: [id], onDelete: Cascade)
 
   @@unique([subscriberId, subscribedToId])
   @@map("subscriptions")
