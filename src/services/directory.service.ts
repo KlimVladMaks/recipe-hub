@@ -1,5 +1,5 @@
 import { prisma } from "../config/database.js";
-import type { DishTypeCreateType, DishTypeUpdateType, IngredientCreateType, IngredientUpdateType } from "../schemas/directory.schema.js";
+import type { DishTypeCreateType, DishTypeUpdateType, IngredientCreateType, IngredientUpdateType } from "../schemas/directory.schemas.js";
 
 export class DirectoryService {
     static async getDishTypes(search: string, page: number, limit: number) {

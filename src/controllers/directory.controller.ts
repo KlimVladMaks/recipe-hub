@@ -12,7 +12,7 @@ import {
     type DishTypeUpdateType, 
     type IngredientCreateType,
     type IngredientUpdateType
-} from "../schemas/directory.schema.js";
+} from "../schemas/directory.schemas.js";
 import { DirectoryService } from "../services/directory.service.js";
 
 

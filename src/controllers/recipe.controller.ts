@@ -9,7 +9,7 @@ import {
     type RecipeCreateType, 
     type RecipeRatingPutType, 
     type RecipeUpdateType,
-} from '../schemas/recipe.schema.js';
+} from '../schemas/recipe.schemas.js';
 import type { Difficulty } from '@prisma/client';
 
 
@@ -59,6 +59,7 @@ export class RecipeController {
                 search as string,
                 dishTypeIds,
                 ingredientIds,
+                true,
                 difficulty as Difficulty
             );
             res.status(200).json(RecipeReadListSchema.parse(recipes));
@@ -84,10 +85,10 @@ export class RecipeController {
                 currentUserId,
                 page,
                 limit,
-                search,
+                search as string,
                 dishTypeIds,
                 ingredientIds,
-                difficulty
+                difficulty as Difficulty,
             );
             res.status(200).json(RecipeReadListSchema.parse(recipes));
         } catch (error: any) {
@@ -116,6 +117,7 @@ export class RecipeController {
                 search as string,
                 dishTypeIds,
                 ingredientIds,
+                false,
                 difficulty as Difficulty
             );
             res.status(200).json(RecipeReadSchema.parse(recipes));
@@ -142,10 +144,10 @@ export class RecipeController {
                 userId,
                 page,
                 limit,
-                search,
+                search as string,
                 dishTypeIds,
                 ingredientIds,
-                difficulty
+                difficulty as Difficulty
             );
             res.status(200).json(RecipeReadListSchema.parse(recipes));
         } catch (error: any) {
@@ -236,9 +238,10 @@ export class RecipeController {
 
     static async getRecipeRating(req: AuthRequest, res: Response) {
         try {
+            const currentUserId = req.currentUserId!;
             const { recipeId:recipeIdStr } = req.params;
             const recipeId = parseInt(recipeIdStr as string);
-            const recipeRating = await RecipeService.getRecipeRating(recipeId);
+            const recipeRating = await RecipeService.getRecipeRating(recipeId, currentUserId);
             res.status(200).json(RecipeRatingReadSchema.parse(recipeRating));
         } catch (error: any) {
             res.status(400).json({

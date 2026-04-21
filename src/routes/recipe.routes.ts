@@ -6,7 +6,7 @@ import {
     RecipeCreateSchema, 
     RecipeRatingPutSchema, 
     RecipeUpdateSchema, 
-} from '../schemas/recipe.schema.js';
+} from '../schemas/recipe.schemas.js';
 
 
 setGlobalOptions({

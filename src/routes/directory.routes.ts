@@ -6,7 +6,7 @@ import {
     DishTypeUpdateSchema, 
     IngredientCreateSchema,
     IngredientUpdateSchema
-} from '../schemas/directory.schema.js';
+} from '../schemas/directory.schemas.js';
 import { DirectoryController } from '../controllers/directory.controller.js';
 
 setGlobalOptions({

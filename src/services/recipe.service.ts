@@ -1,6 +1,6 @@
 import { Difficulty, MediaType, type Prisma } from "@prisma/client";
 import { prisma } from "../config/database.js";
-import type { RecipeCreateType, RecipeUpdateType } from "../schemas/recipe.schema.js";
+import type { RecipeCreateType, RecipeUpdateType } from "../schemas/recipe.schemas.js";
 
 
 export class RecipeService {
@@ -622,9 +622,33 @@ export class RecipeService {
         return transformedRecipe;
     };
 
-    static async deleteRecipe(recipeId) {};
+    static async deleteRecipe(recipeId: number) {
+        await prisma.recipe.delete({
+            where: { id: recipeId },
+        });
+    };
 
-    static async getRecipeRating(recipeId) {};
+    static async getRecipeRating(recipeId: number, userId: number) {
+        const avgResult = await prisma.recipeRating.aggregate({
+            where: { recipeId },
+            _avg: { rating: true },
+        });
+        let userRating: number | null = null;
+        const userRatingRecord = await prisma.recipeRating.findUnique({
+            where: {
+            userId_recipeId: {
+                userId: userId,
+                recipeId: recipeId,
+            },
+            },
+            select: { rating: true },
+        });
+        userRating = userRatingRecord?.rating ?? null;
+        return {
+            avg_rating: avgResult._avg.rating ?? null,
+            rating_by_user: userRating,
+        };
+    };
 
     static async putRecipeRating(recipeId, recipeRatingPutData, userId) {};
 
