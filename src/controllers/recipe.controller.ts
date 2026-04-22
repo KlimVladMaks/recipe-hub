@@ -25,12 +25,22 @@ export class RecipeController {
             } = req.query;
             const page = parseInt(pageStr as string);
             const limit = parseInt(limitStr as string);
-            const dishTypeIds = (dishTypeIdsStr as string)
-                .split(',')
-                .map(id => parseInt(id.trim()));
-            const ingredientIds = (ingredientIdsStr as string)
-                .split(',')
-                .map(id => parseInt(id.trim()));
+            let dishTypeIds: Array<number>;
+            if (dishTypeIdsStr === "") {
+                dishTypeIds = [];
+            } else {
+                dishTypeIds = (dishTypeIdsStr as string)
+                    .split(',')
+                    .map(id => parseInt(id.trim()));
+            };
+            let ingredientIds: Array<number>;
+            if (ingredientIdsStr === "") {
+                ingredientIds = [];
+            } else {
+                ingredientIds = (ingredientIdsStr as string)
+                    .split(',')
+                    .map(id => parseInt(id.trim()));
+            };
             return {
                 page,
                 limit,
@@ -120,7 +130,7 @@ export class RecipeController {
                 false,
                 difficulty as Difficulty
             );
-            res.status(200).json(RecipeReadSchema.parse(recipes));
+            res.status(200).json(RecipeReadListSchema.parse(recipes));
         } catch (error: any) {
             res.status(400).json({
                 message: error.message,

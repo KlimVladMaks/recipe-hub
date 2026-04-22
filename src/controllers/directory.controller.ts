@@ -37,13 +37,6 @@ export class DirectoryController {
 
     static async addDishType(req: AuthRequest, res: Response) {
         try {
-            const currentUserId = req.currentUserId!;
-            if (!(await AuthService.isUserAdmin(currentUserId))) {
-                res.status(403).json({
-                    message: "Доступ только для администраторов"
-                })
-                return;
-            };
             const dishTypeCreateData: DishTypeCreateType = req.body;
             const dishType = await DirectoryService.createDishType(dishTypeCreateData);
             res.status(201).json(DishTypeReadSchema.parse(dishType));
@@ -69,13 +62,6 @@ export class DirectoryController {
 
     static async updateDishType(req: AuthRequest, res: Response) {
         try {
-            const currentUserId = req.currentUserId!;
-            if (!(await AuthService.isUserAdmin(currentUserId))) {
-                res.status(403).json({
-                    message: "Доступ только для администраторов"
-                })
-                return;
-            };
             const { dishTypeId:dishTypeIdStr } = req.params;
             const dishTypeId = parseInt(dishTypeIdStr as string);
             const dishTypeUpdateData: DishTypeUpdateType = req.body;
@@ -90,13 +76,6 @@ export class DirectoryController {
 
     static async deleteDishType(req: AuthRequest, res: Response) {
         try {
-            const currentUserId = req.currentUserId!;
-            if (!(await AuthService.isUserAdmin(currentUserId))) {
-                res.status(403).json({
-                    message: "Доступ только для администраторов"
-                })
-                return;
-            };
             const { dishTypeId:dishTypeIdStr } = req.params;
             const dishTypeId = parseInt(dishTypeIdStr as string);
             await DirectoryService.deleteDishType(dishTypeId);
@@ -128,13 +107,6 @@ export class DirectoryController {
 
     static async addIngredient(req: AuthRequest, res: Response) {
         try {
-            const currentUserId = req.currentUserId!;
-            if (!(await AuthService.isUserAdmin(currentUserId))) {
-                res.status(403).json({
-                    message: "Доступ только для администраторов"
-                })
-                return;
-            };
             const ingredientCreateData: IngredientCreateType = req.body;
             const ingredient = await DirectoryService.createIngredient(ingredientCreateData);
             res.status(201).json(IngredientReadSchema.parse(ingredient));
@@ -160,13 +132,6 @@ export class DirectoryController {
 
     static async updateIngredient(req: AuthRequest, res: Response) {
         try {
-            const currentUserId = req.currentUserId!;
-            if (!(await AuthService.isUserAdmin(currentUserId))) {
-                res.status(403).json({
-                    message: "Доступ только для администраторов"
-                })
-                return;
-            };
             const { ingredientId:ingredientIdStr } = req.params;
             const ingredientId = parseInt(ingredientIdStr as string);
             const ingredientUpdateData: IngredientUpdateType = req.body;
@@ -181,13 +146,6 @@ export class DirectoryController {
 
     static async deleteIngredient(req: AuthRequest, res: Response) {
         try {
-            const currentUserId = req.currentUserId!;
-            if (!(await AuthService.isUserAdmin(currentUserId))) {
-                res.status(403).json({
-                    message: "Доступ только для администраторов"
-                })
-                return;
-            };
             const { ingredientId:ingredientIdStr } = req.params;
             const ingredientId = parseInt(ingredientIdStr as string);
             await DirectoryService.deleteIngredient(ingredientId);

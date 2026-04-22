@@ -106,7 +106,7 @@ export type RecipeRatingReadType = z.infer<typeof RecipeRatingReadSchema>;
 
 
 export const RecipeRatingPutSchema = z.object({
-    rating: z.number(),
+    rating: z.number().min(1).max(10),
 });
 export type RecipeRatingPutType = z.infer<typeof RecipeRatingPutSchema>;
 

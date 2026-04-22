@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { authMiddleware } from '../middlewares/auth.middleware.js';
+import { authMiddleware, isAdmin } from '../middlewares/auth.middleware.js';
 import validate, { setGlobalOptions } from 'express-zod-safe';
 import { 
     DishTypeCreateSchema, 
@@ -13,7 +13,7 @@ setGlobalOptions({
     missingSchemaBehavior: 'any'
 });
 
-const directoryRouter = Router()
+const directoryRouter = Router();
 
 directoryRouter.get('/dish-types',
     authMiddleware,
@@ -22,6 +22,7 @@ directoryRouter.get('/dish-types',
 
 directoryRouter.post('/dish-types',
     authMiddleware,
+    isAdmin,
     validate({
         body: DishTypeCreateSchema
     }),
@@ -35,6 +36,7 @@ directoryRouter.get('/dish-types/:dishTypeId',
 
 directoryRouter.patch('/dish-types/:dishTypeId',
     authMiddleware,
+    isAdmin,
     validate({
         body: DishTypeUpdateSchema
     }),
@@ -43,6 +45,7 @@ directoryRouter.patch('/dish-types/:dishTypeId',
 
 directoryRouter.delete('/dish-types/:dishTypeId',
     authMiddleware,
+    isAdmin,
     DirectoryController.deleteDishType
 );
 
@@ -53,6 +56,7 @@ directoryRouter.get('/ingredients',
 
 directoryRouter.post('/ingredients',
     authMiddleware,
+    isAdmin,
     validate({
         body: IngredientCreateSchema
     }),
@@ -66,6 +70,7 @@ directoryRouter.get('/ingredients/:ingredientId',
 
 directoryRouter.patch('/ingredients/:ingredientId',
     authMiddleware,
+    isAdmin,
     validate({
         body: IngredientUpdateSchema
     }),
@@ -74,6 +79,7 @@ directoryRouter.patch('/ingredients/:ingredientId',
 
 directoryRouter.delete('/ingredients/:ingredientId',
     authMiddleware,
+    isAdmin,
     DirectoryController.deleteIngredient
 );
 

@@ -49,7 +49,14 @@ export const isAdmin = (
     res: Response,
     next: NextFunction
 ) => {
-
+    const currentUserId = req.currentUserId!;
+    if (!AuthService.isUserAdmin(currentUserId)) {
+        res.status(403).json({
+            message: "Доступ только для администраторов"
+        })
+        return;
+    };
+    next();
 };
 
 
@@ -58,7 +65,7 @@ export const isRecipeAuthor = (
     res: Response,
     next: NextFunction
 ) => {
-    const currentUserId = req.currentUserId;
+    const currentUserId = req.currentUserId!;
     const { recipeId:recipeIdStr } = req.params;
     const recipeId = parseInt(recipeIdStr as string);
     if (!RecipeService.isUserRecipeAuthor(currentUserId, recipeId)) {
@@ -76,7 +83,7 @@ export const isRecipeAuthorOrAdmin = (
     res: Response,
     next: NextFunction
 ) => {
-    const currentUserId = req.currentUserId;
+    const currentUserId = req.currentUserId!;
     const { recipeId:recipeIdStr } = req.params;
     const recipeId = parseInt(recipeIdStr as string);
     if (!(RecipeService.isUserRecipeAuthor(currentUserId, recipeId) || AuthService.isUserAdmin(currentUserId))) {

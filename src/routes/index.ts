@@ -1,4 +1,4 @@
-import express from 'express';
+import { Router } from 'express'
 import authRouter from './auth.routes.js';
 import userRouter from './user.routes.js';
 import directoryRouter from './directory.routes.js';
@@ -7,7 +7,7 @@ import commentRouter from './comment.routes.js';
 import subscriptionRouter from './subscription.routes.js';
 import stepRouter from './step.routes.js';
 
-const router = express.Router();
+const router = Router();
 
 router.use(authRouter);
 router.use(userRouter);

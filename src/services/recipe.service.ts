@@ -1,12 +1,9 @@
 import { Difficulty, MediaType, type Prisma } from "@prisma/client";
 import { prisma } from "../config/database.js";
-import type { RecipeCreateType, RecipeUpdateType } from "../schemas/recipe.schemas.js";
+import type { RecipeCreateType, RecipeRatingPutType, RecipeUpdateType } from "../schemas/recipe.schemas.js";
 
 
 export class RecipeService {
-    /**
-     * Возвращает список рецептов пользователя.
-     */
     static async getUserRecipes(
         userId: number,
         page: number = 1,
@@ -17,6 +14,13 @@ export class RecipeService {
         includeUnpublished: boolean = false,
         difficulty?: Difficulty,
     ) {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+        });
+        if (!user) {
+            throw new Error('Пользователь не найден');
+        }
+
         const skip = (page - 1) * limit;
         const where: Prisma.RecipeWhereInput = {};
         
@@ -121,6 +125,13 @@ export class RecipeService {
         ingredientIds: Array<number> = [],
         difficulty?: Difficulty
     ) {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+        });
+        if (!user) {
+            throw new Error('Пользователь не найден');
+        }
+
         const skip = (page - 1) * limit;
         const where: Prisma.SavedRecipeWhereInput = {};
         
@@ -195,50 +206,44 @@ export class RecipeService {
     });
     
     const transformedRecipes = savedRecipes.map(savedRecipe => ({
-        savedAt: savedRecipe.savedAt,
-        recipe: {
-            id: savedRecipe.recipe.id,
-            title: savedRecipe.recipe.title,
-            dishTypes: savedRecipe.recipe.recipeDishTypes.map(rdt => ({
-                id: rdt.dishType.id,
-                title: rdt.dishType.title
-            })),
-            ingredients: savedRecipe.recipe.recipeIngredients.map(ri => ({
-                id: ri.ingredient.id,
-                title: ri.ingredient.title
-            })),
-            description: savedRecipe.recipe.description,
-            media: savedRecipe.recipe.media.map(media => ({
-                id: media.id,
-                sortOrder: media.sortOrder,
-                mediaType: media.mediaType,
-                mediaUrl: media.mediaUrl,
-                createdAt: media.createdAt,
-                updatedAt: media.updatedAt
-            })),
-            difficulty: savedRecipe.recipe.difficulty,
-            createdAt: savedRecipe.recipe.createdAt,
-            updatedAt: savedRecipe.recipe.updatedAt,
-            isPublished: savedRecipe.recipe.isPublished,
-            author: {
-                id: savedRecipe.recipe.author.id,
-                username: savedRecipe.recipe.author.username,
-                firstName: savedRecipe.recipe.author.firstName,
-                lastName: savedRecipe.recipe.author.lastName,
-                about: savedRecipe.recipe.author.about,
-                role: savedRecipe.recipe.author.role,
-                createdAt: savedRecipe.recipe.author.createdAt,
-                updatedAt: savedRecipe.recipe.author.updatedAt
-            }
+        id: savedRecipe.recipe.id,
+        title: savedRecipe.recipe.title,
+        dishTypes: savedRecipe.recipe.recipeDishTypes.map(rdt => ({
+            id: rdt.dishType.id,
+            title: rdt.dishType.title
+        })),
+        ingredients: savedRecipe.recipe.recipeIngredients.map(ri => ({
+            id: ri.ingredient.id,
+            title: ri.ingredient.title
+        })),
+        description: savedRecipe.recipe.description,
+        media: savedRecipe.recipe.media.map(media => ({
+            id: media.id,
+            sortOrder: media.sortOrder,
+            mediaType: media.mediaType,
+            mediaUrl: media.mediaUrl,
+            createdAt: media.createdAt,
+            updatedAt: media.updatedAt
+        })),
+        difficulty: savedRecipe.recipe.difficulty,
+        createdAt: savedRecipe.recipe.createdAt,
+        updatedAt: savedRecipe.recipe.updatedAt,
+        isPublished: savedRecipe.recipe.isPublished,
+        author: {
+            id: savedRecipe.recipe.author.id,
+            username: savedRecipe.recipe.author.username,
+            firstName: savedRecipe.recipe.author.firstName,
+            lastName: savedRecipe.recipe.author.lastName,
+            about: savedRecipe.recipe.author.about,
+            role: savedRecipe.recipe.author.role,
+            createdAt: savedRecipe.recipe.author.createdAt,
+            updatedAt: savedRecipe.recipe.author.updatedAt
         }
     }));
     
     return transformedRecipes;
     };
 
-    /**
-     * Возвращает список всех рецептов с поддержкой пагинации, фильтрации и поиска.
-     */
     static async getRecipes(
         page: number = 1,
         limit: number = 10,
@@ -374,7 +379,7 @@ export class RecipeService {
 
         // Медиафайлы рецепта
         if (media && media.length > 0) {
-            recipeData.recipeMedia = {
+            recipeData.media = {
                 create: media.map(m => ({
                     sortOrder: m.sortOrder,
                     mediaType: m.mediaType as MediaType,
@@ -390,7 +395,7 @@ export class RecipeService {
                 include: {
                     recipeDishTypes: { include: { dishType: true } },
                     recipeIngredients: { include: { ingredient: true } },
-                    recipeMedia: true,
+                    media: true,
                     author: { select: { id: true, username: true } }
                 }
             });
@@ -650,13 +655,84 @@ export class RecipeService {
         };
     };
 
-    static async putRecipeRating(recipeId, recipeRatingPutData, userId) {};
+    static async putRecipeRating(recipeId: number, recipeRatingPutData: RecipeRatingPutType, userId: number) {
+        const { rating } = recipeRatingPutData;
+        await prisma.recipeRating.upsert({
+            where: {
+                userId_recipeId: {
+                    userId: userId,
+                    recipeId: recipeId,
+                }
+            },
+            update: {
+                rating: rating,
+                ratedAt: new Date(),
+            },
+            create: {
+                userId: userId,
+                recipeId: recipeId,
+                rating: rating,
+            }
+        });
+        return await RecipeService.getRecipeRating(recipeId, userId);
+    };
 
-    static async deleteRecipeRating(recipeId, userId) {};
+    static async deleteRecipeRating(recipeId: number, userId: number) {
+        await prisma.recipeRating.deleteMany({
+            where: {
+                userId: userId,
+                recipeId: recipeId,
+            },
+        });
+    };
 
-    static async isRecipeSaved(recipeId, userId) {};
+    static async isRecipeSaved(recipeId: number, userId: number) {
+        const saved = await prisma.savedRecipe.findUnique({
+            where: {
+                userId_recipeId: {
+                    userId: userId,
+                    recipeId: recipeId,
+                }
+            }
+        });
+        return { isSaved: saved !== null };
+    };
 
-    static async saveRecipe(recipeId, userId) {};
+    static async saveRecipe(recipeId: number, userId: number) {
+        await prisma.savedRecipe.upsert({
+            where: {
+                userId_recipeId: {
+                    userId: userId,
+                    recipeId: recipeId,
+                },
+            },
+            update: {},
+            create: {
+                userId: userId,
+                recipeId: recipeId,
+            },
+        });
+    };
 
-    static async unsaveRecipe(recipeId, userId) {};
+    static async unsaveRecipe(recipeId: number, userId: number) {
+        await prisma.savedRecipe.deleteMany({
+            where: {
+                userId: userId,
+                recipeId: recipeId,
+            },
+        });
+    };
+
+    static async isUserRecipeAuthor(userId: number, recipeId: number) {
+        const recipe = await prisma.recipe.findFirst({
+        where: {
+            id: recipeId,
+            authorId: userId,
+        },
+        select: {
+            id: true,
+        },
+        });
+        return recipe !== null;
+    };
 };
