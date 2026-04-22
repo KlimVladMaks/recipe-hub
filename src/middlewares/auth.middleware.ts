@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { jwtConfig } from '../config/jwt.js';
 import { RecipeService } from '../services/recipe.service.js';
 import { AuthService } from '../services/auth.service.js';
+import { CommentService } from '../services/comment.service.js';
 
 
 export interface AuthRequest extends Request {
@@ -80,7 +81,7 @@ export const isRecipeAuthor = async (
 };
 
 
-export const isRecipeAuthorOrAdmin = (
+export const isRecipeAuthorOrAdmin = async (
     req: AuthRequest,
     res: Response,
     next: NextFunction
@@ -88,7 +89,48 @@ export const isRecipeAuthorOrAdmin = (
     const currentUserId = req.currentUserId!;
     const { recipeId:recipeIdStr } = req.params;
     const recipeId = parseInt(recipeIdStr as string);
-    if (!(RecipeService.isUserRecipeAuthor(currentUserId, recipeId) || AuthService.isUserAdmin(currentUserId))) {
+    const isRecipeAuthor = await RecipeService.isUserRecipeAuthor(currentUserId, recipeId);
+    const isAdmin = await AuthService.isUserAdmin(currentUserId);
+    if (!(isRecipeAuthor || isAdmin)) {
+        res.status(403).json({
+            message: "Доступ только для автора рецепта и администраторов"
+        })
+        return;
+    };
+    next();
+};
+
+
+export const isCommentAuthor = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+) => {
+    const currentUserId = req.currentUserId!;
+    const { commentId:commentIdStr } = req.params;
+    const commentId = parseInt(commentIdStr as string);
+    const isCommentAuthor = await CommentService.isUserCommentAuthor(currentUserId, commentId);
+    if (!isCommentAuthor) {
+        res.status(403).json({
+            message: "Доступ только для автора комментария"
+        });
+        return;
+    }
+    next();
+};
+
+
+export const isCommentAuthorOrAdmin = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+) => {
+    const currentUserId = req.currentUserId!;
+    const { commentId:commentIdStr } = req.params;
+    const commentId = parseInt(commentIdStr as string);
+    const isCommentAuthor = await CommentService.isUserCommentAuthor(currentUserId, commentId);
+    const isAdmin = await AuthService.isUserAdmin(currentUserId);
+    if (!(isCommentAuthor || isAdmin)) {
         res.status(403).json({
             message: "Доступ только для автора рецепта и администраторов"
         })

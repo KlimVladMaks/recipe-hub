@@ -1,1 +1,3 @@
-export class CommentService {}
+export class CommentService {
+    static async isUserCommentAuthor(userId: number, commentId: number) {};
+}
