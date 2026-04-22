@@ -5,10 +5,9 @@ import { z } from 'zod'
 
 
 export const StepMediaReadSchema = z.object({
-    id: z.number(),
     sortOrder: z.number(),
-    mediaType: z.number(),
-    mediaUrl: z.number(),
+    mediaType: z.string(),
+    mediaUrl: z.string(),
     createdAt: z.date(),
     updatedAt: z.date(),
 });
@@ -65,7 +64,7 @@ export type StepReadListType = z.infer<typeof StepReadListSchema>;
 export const StepCreateSchema = z.object({
     number: z.number(),
     title: z.string(),
-    media: StepMediaCreateSchema.optional(),
+    media: StepMediaCreateListSchema.optional(),
     description: z.string().optional(),
 });
 export type StepCreateType = z.infer<typeof StepCreateSchema>;
@@ -74,7 +73,7 @@ export type StepCreateType = z.infer<typeof StepCreateSchema>;
 export const StepUpdateSchema = z.object({
     number: z.number().optional(),
     title: z.string().optional(),
-    media: StepMediaUpdateSchema.optional(),
+    media: StepMediaUpdateListSchema.optional(),
     description: z.string().nullable().optional(),
 });
 export type StepUpdateType = z.infer<typeof StepUpdateSchema>;

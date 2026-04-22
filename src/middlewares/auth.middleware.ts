@@ -44,13 +44,14 @@ export const authMiddleware = (
 };
 
 
-export const isAdmin = (
+export const isAdmin = async (
     req: AuthRequest,
     res: Response,
     next: NextFunction
 ) => {
     const currentUserId = req.currentUserId!;
-    if (!AuthService.isUserAdmin(currentUserId)) {
+    const isUserAdmin = await AuthService.isUserAdmin(currentUserId);
+    if (!isUserAdmin) {
         res.status(403).json({
             message: "Доступ только для администраторов"
         })
@@ -60,7 +61,7 @@ export const isAdmin = (
 };
 
 
-export const isRecipeAuthor = (
+export const isRecipeAuthor = async (
     req: AuthRequest,
     res: Response,
     next: NextFunction
@@ -68,7 +69,8 @@ export const isRecipeAuthor = (
     const currentUserId = req.currentUserId!;
     const { recipeId:recipeIdStr } = req.params;
     const recipeId = parseInt(recipeIdStr as string);
-    if (!RecipeService.isUserRecipeAuthor(currentUserId, recipeId)) {
+    const isUserRecipeAuthor = await RecipeService.isUserRecipeAuthor(currentUserId, recipeId);
+    if (!isUserRecipeAuthor) {
         res.status(403).json({
             message: "Доступ только для автора рецепта"
         });
