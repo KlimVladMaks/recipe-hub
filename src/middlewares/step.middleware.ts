@@ -11,7 +11,6 @@ export const isCorrectStepId = async (
     const { recipeId: recipeIdStr, stepId: stepIdStr } = req.params;
     const recipeId = parseInt(recipeIdStr as string);
     const stepId = parseInt(stepIdStr as string);
-
     const isValid = await StepService.isCorrectStepId(stepId, recipeId);
     if (!isValid) {
         res.status(400).json({
