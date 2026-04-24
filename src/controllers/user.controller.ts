@@ -61,7 +61,7 @@ export class UserController {
         try {
             const currentUserId = req.currentUserId!;
             await UserService.deleteUser(currentUserId);
-            res.status(204);
+            res.status(204).send();
         } catch (error: any) {
             res.status(400).json({
                 message: error.message,
