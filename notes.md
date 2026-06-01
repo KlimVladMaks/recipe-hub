@@ -1,44 +1,22 @@
 # Заметки
 
-## Основные команды
-
-```
-# Запуск БД
-docker-compose up -d
-
-# Запуск сервера
-npm run dev
-
-# Остановка БД
-docker-compose down
-```
-
-## Запуск сервера
-
-```
-npm run dev
-```
-
 ## Docker
 
 ```
 # Список запущенных сервисов
-docker-compose ps
+docker compose ps
 
 # Запуск в фоновом режиме 
-docker-compose up -d
+docker compose up -d
+
+# Запуск с пересборкой образов
+docker compose up -d --build
 
 # Остановка и удаление контейнеров (тома сохраняются)
-docker-compose down
-
-# Остановка контейнера
-docker-compose stop
-
-# Запуск остановленного контейнера
-docker-compose start
+docker compose down
 
 # Остановить и удалить контейнер вместе с томами
-docker-compose down -v
+docker compose down -v
 
 # Посмотреть существующие тома
 docker volume ls
@@ -48,19 +26,10 @@ docker volume prune
 
 # Удалить все тома
 docker volume rm $(docker volume ls -q)
-```
 
-## Prisma
+# Посмотреть все логи
+docker compose logs
 
-```
-# Миграции
-npx prisma migrate dev --name <название_миграции>
-npx prisma migrate dev
-
-# Создание клиента Prisma
-# (нужно вызывать после каждого изменения `prisma/schema.prisma`)
-npx prisma generate
-
-# Запуск Prisma Studio
-npx prisma studio
+# Посмотреть логи конкретного сервиса
+docker compose logs <название_сервиса>
 ```

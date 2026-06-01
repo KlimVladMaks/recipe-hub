@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  user-db:
+    image: postgres:18.3-alpine
+    container_name: user-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: user_db
+      PGDATA: /var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+
+  recipe-db:
+    image: postgres:18.3-alpine
+    container_name: recipe-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: recipe_db
+      PGDATA: /var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    volumes:
+      - recipe_db_data:/var/lib/postgresql/data
+
+  social-db:
+    image: postgres:18.3-alpine
+    container_name: social-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: social_db
+      PGDATA: /var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    volumes:
+      - social_db_data:/var/lib/postgresql/data
+
+volumes:
+  user_db_data:
+  recipe_db_data:
+  social_db_data:
