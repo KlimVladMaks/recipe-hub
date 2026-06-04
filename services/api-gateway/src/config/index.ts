@@ -13,7 +13,7 @@ if (missing.length > 0) {
 
 export const config = {
     port: Number(process.env.PORT),
-    services: {
+    service_urls: {
         user: process.env.USER_SERVICE_URL as string,
         recipe: process.env.RECIPE_SERVICE_URL as string
     },
