@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   user-db:
     image: postgres:18.3-alpine
@@ -14,26 +12,26 @@ services:
     volumes:
       - user_db_data:/var/lib/postgresql/data
 
-  recipe-db:
-    image: postgres:18.3-alpine
-    container_name: recipe-db
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: recipe_db
-      PGDATA: /var/lib/postgresql/data
-    ports:
-      - "5434:5432"
-    volumes:
-      - recipe_db_data:/var/lib/postgresql/data
+  # recipe-db:
+  #   image: postgres:18.3-alpine
+  #   container_name: recipe-db
+  #   environment:
+  #     POSTGRES_USER: user
+  #     POSTGRES_PASSWORD: password
+  #     POSTGRES_DB: recipe_db
+  #     PGDATA: /var/lib/postgresql/data
+  #   ports:
+  #     - "5434:5432"
+  #   volumes:
+  #     - recipe_db_data:/var/lib/postgresql/data
   
-  api-gateway:
-    build: ./services/api-gateway
-    ports:
-      - "3000:3000"
-    env_file:
-      - ./services/api-gateway/.env
+  # api-gateway:
+  #   build: ./services/api-gateway
+  #   ports:
+  #     - "3000:3000"
+  #   env_file:
+  #     - ./services/api-gateway/.env
 
 volumes:
   user_db_data:
-  recipe_db_data:
+  # recipe_db_data:
