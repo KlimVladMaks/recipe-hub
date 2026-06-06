@@ -32,4 +32,7 @@ docker compose logs
 
 # Посмотреть логи конкретного сервиса
 docker compose logs <название_сервиса>
+docker compose logs user-db
+docker compose logs user-service
+docker compose logs api-gateway
 ```
