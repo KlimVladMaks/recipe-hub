@@ -11,6 +11,11 @@ services:
       - "5433:5432"
     volumes:
       - user_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d user_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # recipe-db:
   #   image: postgres:18.3-alpine
@@ -24,13 +29,26 @@ services:
   #     - "5434:5432"
   #   volumes:
   #     - recipe_db_data:/var/lib/postgresql/data
+
+  user-service:
+    build: ./services/user
+    env_file:
+      - ./services/user/.env
+    depends_on:
+      user-db:
+        condition: service_healthy
+    restart: on-failure
   
-  # api-gateway:
-  #   build: ./services/api-gateway
-  #   ports:
-  #     - "3000:3000"
-  #   env_file:
-  #     - ./services/api-gateway/.env
+  api-gateway:
+    build: ./services/api-gateway
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./services/api-gateway/.env
+    depends_on:
+      user-service:
+        condition: service_started
+    restart: on-failure
 
 volumes:
   user_db_data:
