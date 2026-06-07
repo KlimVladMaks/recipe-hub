@@ -49,6 +49,38 @@ services:
       user-service:
         condition: service_started
     restart: on-failure
+  
+  prisma-studio-user:
+    build: ./services/user
+    container_name: prisma-studio-user
+    command: ["npx", "prisma", "studio", "--port", "5555"]
+    ports:
+      - "5555:5555"
+    environment:
+      - BROWSER=none
+    env_file:
+      - ./services/user/.env
+    depends_on:
+      user-db:
+        condition: service_healthy
+    profiles:
+      - prisma-studio
+  
+  # prisma-studio-recipe:
+  #   build: ./services/recipe
+  #   container_name: prisma-studio-recipe
+  #   command: ["npx", "prisma", "studio", "--port", "5556"]
+  #   ports:
+  #     - "5556:5556"
+  #   environment:
+  #     - BROWSER=none
+  #   env_file:
+  #     - ./services/recipe/.env
+  #   depends_on:
+  #     recipe-db:
+  #       condition: service_healthy
+  #   profiles:
+  #     - prisma-studio
 
 volumes:
   user_db_data:
