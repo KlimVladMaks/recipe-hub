@@ -8,6 +8,15 @@ import { config } from "../config";
 const router = Router();
 
 
+router.get('/api-gateway-health', (_req, res) => {
+    res.status(200).json({
+        status: 'api-gateway OK', 
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    })
+});
+
+
 // ========== RECIPE SERVICE ==========
 
 router.use('/recipes', authMiddleware, createProxy(config.service_urls.recipe));
@@ -21,6 +30,7 @@ router.use('/users/:userId/saved-recipes', authMiddleware, createProxy(config.se
 
 // ========== USER SERVICE ==========
 
+router.use('/user-service-health', createProxy(config.service_urls.user));
 router.use('/auth', createProxy(config.service_urls.user));
 router.use('/users', authMiddleware, createProxy(config.service_urls.user));
 
