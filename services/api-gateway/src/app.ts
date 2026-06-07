@@ -7,6 +7,7 @@ import { errorHandler } from './middleware/errorHandler';
 
 export const createApp = () => {
     const app = express();
+    app.use(express.json());
     app.use(morgan('dev'));
     app.use('/api', routes);
     app.use(errorHandler);
