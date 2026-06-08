@@ -19,6 +19,7 @@ router.get('/api-gateway-health', (_req, res) => {
 
 // ========== RECIPE SERVICE ==========
 
+router.use('/recipe-service-health', createProxy(config.service_urls.recipe));
 router.use('/recipes', authMiddleware, createProxy(config.service_urls.recipe));
 router.use('/dish-types', authMiddleware, createProxy(config.service_urls.recipe));
 router.use('/ingredients', authMiddleware, createProxy(config.service_urls.recipe));

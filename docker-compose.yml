@@ -34,6 +34,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  
+  recipe-service:
+    build: ./services/recipe
+    env_file:
+      - ./services/recipe/.env
+    depends_on:
+      recipe-db:
+        condition: service_healthy
+    restart: on-failure
 
   user-service:
     build: ./services/user
@@ -53,6 +62,8 @@ services:
     depends_on:
       user-service:
         condition: service_started
+      recipe-service:
+        condition: service_started
     restart: on-failure
   
   prisma-studio-user:
@@ -71,21 +82,21 @@ services:
     profiles:
       - prisma-studio
   
-  # prisma-studio-recipe:
-  #   build: ./services/recipe
-  #   container_name: prisma-studio-recipe
-  #   command: ["npx", "prisma", "studio", "--port", "5556"]
-  #   ports:
-  #     - "5556:5556"
-  #   environment:
-  #     - BROWSER=none
-  #   env_file:
-  #     - ./services/recipe/.env
-  #   depends_on:
-  #     recipe-db:
-  #       condition: service_healthy
-  #   profiles:
-  #     - prisma-studio
+  prisma-studio-recipe:
+    build: ./services/recipe
+    container_name: prisma-studio-recipe
+    command: ["npx", "prisma", "studio", "--port", "5556"]
+    ports:
+      - "5556:5556"
+    environment:
+      - BROWSER=none
+    env_file:
+      - ./services/recipe/.env
+    depends_on:
+      recipe-db:
+        condition: service_healthy
+    profiles:
+      - prisma-studio
 
 volumes:
   user_db_data:
