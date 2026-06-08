@@ -22,4 +22,7 @@ npx prisma studio
 
 # Сброс БД и повторное применение миграций
 npx prisma migrate reset
+
+# Быстрая синхронизация текущей схемы Prisma c БД (без миграции)
+npx prisma db push
 ```
