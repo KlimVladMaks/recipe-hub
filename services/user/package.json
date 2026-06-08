@@ -1,6 +1,5 @@
 {
-  "name": "recipe-hub",
-  "description": "Сервис для обмена рецептами и кулинарных блогов",
+  "name": "user-service",
   "main": "app.js",
   "author": "Владислав Клименков",
   "type": "module",
