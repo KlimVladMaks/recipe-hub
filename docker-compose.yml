@@ -17,18 +17,18 @@ services:
       timeout: 5s
       retries: 5
 
-  # recipe-db:
-  #   image: postgres:18.3-alpine
-  #   container_name: recipe-db
-  #   environment:
-  #     POSTGRES_USER: user
-  #     POSTGRES_PASSWORD: password
-  #     POSTGRES_DB: recipe_db
-  #     PGDATA: /var/lib/postgresql/data
-  #   ports:
-  #     - "5434:5432"
-  #   volumes:
-  #     - recipe_db_data:/var/lib/postgresql/data
+  recipe-db:
+    image: postgres:18.3-alpine
+    container_name: recipe-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: recipe_db
+      PGDATA: /var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    volumes:
+      - recipe_db_data:/var/lib/postgresql/data
 
   user-service:
     build: ./services/user
