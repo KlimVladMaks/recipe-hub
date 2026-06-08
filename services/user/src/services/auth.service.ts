@@ -1,7 +1,9 @@
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 
 import { prisma } from "../config/database";
-import { RegisterRequestType } from "../schemas/auth.schemas";
+import { LoginRequestType, RegisterRequestType } from "../schemas/auth.schemas";
+import { config } from "../config";
 
 
 export class AuthService {
@@ -24,5 +26,28 @@ export class AuthService {
             },
         });
         return user;
+    }
+
+    static async login(loginRequestData: LoginRequestType) {
+        const { username, password } = loginRequestData;
+        const user = await prisma.user.findUnique({
+            where: { username },
+        });
+        if (!user) {
+            throw new Error('Неверное имя пользователя или пароль');
+        }
+        const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+        if (!isPasswordValid) {
+            throw new Error('Неверное имя пользователя или пароль');
+        }
+        const token = jwt.sign(
+            { currentUserId: user.id }, 
+            config.jwt.secret,
+            { expiresIn: config.jwt.expiresIn } as jwt.SignOptions
+        );
+        return { 
+            user: user, 
+            jwtToken: token,
+        }
     }
 }

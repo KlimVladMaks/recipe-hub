@@ -11,5 +11,8 @@ if (missing.length > 0) {
 
 export const config = {
     port: Number(process.env.PORT),
-    jwtSecret: process.env.JWT_SECRET as string
+    jwt: {
+        secret: process.env.JWT_SECRET as string,
+        expiresIn: "1d"
+    }
 }

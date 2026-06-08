@@ -2,7 +2,7 @@ import { Router } from 'express'
 import validate from 'express-zod-safe'
 import { setGlobalOptions } from 'express-zod-safe';
 
-import { RegisterRequestSchema } from '../schemas/auth.schemas';
+import { LoginRequestSchema, RegisterRequestSchema } from '../schemas/auth.schemas';
 import { AuthController } from '../controllers/auth.controller';
 
 setGlobalOptions({
@@ -16,6 +16,13 @@ authRouter.post('/auth/register',
         body: RegisterRequestSchema 
     }),
     AuthController.register
+);
+
+authRouter.post('/auth/login',
+    validate({
+        body: LoginRequestSchema
+    }),
+    AuthController.login
 );
 
 export default authRouter;
