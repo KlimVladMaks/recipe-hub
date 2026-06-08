@@ -13,8 +13,8 @@ export const createApp = () => {
     //     next();
     // });
 
-    app.use(express.json());
     app.use(morgan('dev'));
+    app.use(express.json());
     app.use('/api', routes);
     app.use(errorHandler);
     return app;

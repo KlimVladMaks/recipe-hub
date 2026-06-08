@@ -3,6 +3,7 @@ const requiredEnv = [
     'USER_SERVICE_URL',
     'RECIPE_SERVICE_URL',
     'JWT_SECRET',
+    'X_USER_ID'
 ];
 
 const missing = requiredEnv.filter((name) => !process.env[name]);
@@ -18,4 +19,5 @@ export const config = {
         recipe: process.env.RECIPE_SERVICE_URL as string
     },
     jwtSecret: process.env.JWT_SECRET as string,
+    xUserId: process.env.X_USER_ID as string
 };

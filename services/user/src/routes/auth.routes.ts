@@ -2,8 +2,13 @@ import { Router } from 'express'
 import validate from 'express-zod-safe'
 import { setGlobalOptions } from 'express-zod-safe';
 
-import { LoginRequestSchema, RegisterRequestSchema } from '../schemas/auth.schemas';
+import { 
+    ChangePasswordRequestSchema, 
+    LoginRequestSchema, 
+    RegisterRequestSchema 
+} from '../schemas/auth.schemas';
 import { AuthController } from '../controllers/auth.controller';
+import { authMiddleware } from '../middleware/auth.middleware';
 
 setGlobalOptions({
     missingSchemaBehavior: 'any'
@@ -23,6 +28,14 @@ authRouter.post('/auth/login',
         body: LoginRequestSchema
     }),
     AuthController.login
+);
+
+authRouter.patch('/users/me/password',
+    authMiddleware,
+    validate({
+        body: ChangePasswordRequestSchema
+    }),
+    AuthController.changePassword
 );
 
 export default authRouter;

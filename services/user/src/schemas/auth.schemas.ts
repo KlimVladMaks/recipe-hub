@@ -25,3 +25,9 @@ export const LoginResponseSchema = z.object({
     jwtToken: z.string(),
 })
 export type LoginResponseType = z.infer<typeof LoginResponseSchema>;
+
+export const ChangePasswordRequestSchema = z.object({
+  oldPassword: z.string(),
+  newPassword: z.string(),
+});
+export type ChangePasswordRequestType = z.infer<typeof ChangePasswordRequestSchema>;

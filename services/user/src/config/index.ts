@@ -1,6 +1,7 @@
 const requiredEnv = [
     'PORT',
     'JWT_SECRET',
+    'X_USER_ID',
 ];
 
 const missing = requiredEnv.filter((name) => !process.env[name]);
@@ -14,5 +15,6 @@ export const config = {
     jwt: {
         secret: process.env.JWT_SECRET as string,
         expiresIn: "1d"
-    }
+    },
+    xUserId: process.env.X_USER_ID as string,
 }
