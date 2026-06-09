@@ -1,7 +1,10 @@
 import { Router } from 'express'
 import validate from 'express-zod-safe'
 import { setGlobalOptions } from 'express-zod-safe';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { 
+    authMiddleware, 
+    isAdmin 
+} from '../middleware/auth.middleware';
 import { DirectoryController } from '../controllers/directory.controller';
 import { DishTypeCreateSchema } from '../schemas/directory.schemas';
 

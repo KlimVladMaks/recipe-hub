@@ -18,8 +18,12 @@ export const authMiddleware = (
     }
     const token = authHeader.split(' ')[1];
     try {
-        const decoded = jwt.verify(token, config.jwtSecret) as { currentUserId: number };
+        const decoded = jwt.verify(token, config.jwtSecret) as { 
+            currentUserId: number,
+            userRole: string
+        };
         req.headers[config.xUserId] = String(decoded.currentUserId);
+        req.headers[config.xUserRole] = decoded.userRole;
         next();
     } catch (error) {
         res.status(401).json({ 

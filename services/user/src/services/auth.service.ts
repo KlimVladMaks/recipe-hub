@@ -45,7 +45,10 @@ export class AuthService {
             throw new Error('Неверное имя пользователя или пароль');
         }
         const token = jwt.sign(
-            { currentUserId: user.id }, 
+            { 
+                currentUserId: user.id,
+                userRole: user.role
+            }, 
             config.jwt.secret,
             { expiresIn: config.jwt.expiresIn } as jwt.SignOptions
         );

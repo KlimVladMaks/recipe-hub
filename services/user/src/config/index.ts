@@ -2,6 +2,7 @@ const requiredEnv = [
     'PORT',
     'JWT_SECRET',
     'X_USER_ID',
+    'X_USER_ROLE',
 ];
 
 const missing = requiredEnv.filter((name) => !process.env[name]);
@@ -17,4 +18,5 @@ export const config = {
         expiresIn: "1d"
     },
     xUserId: process.env.X_USER_ID as string,
+    xUserRole: process.env.X_USER_ROLE as string,
 }

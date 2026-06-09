@@ -23,3 +23,19 @@ export const authMiddleware = (
         });
     }
 }
+
+
+export const isAdmin = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+) => {
+    const userRole = req.headers[config.xUserRole];
+    if (userRole != "admin") {
+        res.status(403).json({
+            message: "Доступ только для администраторов"
+        })
+        return;
+    };
+    next();
+}
