@@ -26,6 +26,7 @@ export const LoginResponseSchema = z.object({
 })
 export type LoginResponseType = z.infer<typeof LoginResponseSchema>;
 
+
 export const ChangePasswordRequestSchema = z.object({
   oldPassword: z.string(),
   newPassword: z.string(),
