@@ -1,6 +1,5 @@
 import { prisma } from "../config/database.js";
 import type { IsSubscribedToUserReadType } from "../schemas/subscription.schema.js";
-import type { UserReadType } from "../schemas/user.schemas.js";
 
 
 export class SubscriptionService {
@@ -52,59 +51,12 @@ export class SubscriptionService {
         }));
     }
 
-    static async getFeed(userId: number, page: number, limit: number) {
+    static async getSubscribedAuthorIds(userId: number): Promise<number[]> {
         const subscriptions = await prisma.subscription.findMany({
             where: { subscriberId: userId },
             select: { subscribedToId: true },
         });
-        const authorIds = subscriptions.map(s => s.subscribedToId);
-        if (authorIds.length === 0) {
-            return []; 
-        }
-
-        const skip = (page - 1) * limit;
-
-        const recipes = await prisma.recipe.findMany({
-            where: {
-                isPublished: true,
-                authorId: { in: authorIds },
-            },
-            skip,
-            take: limit,
-            orderBy: { createdAt: 'desc' },
-            include: {
-                author: true,
-                media: true,
-            },
-        });
-
-        return recipes.map(recipe => ({
-            id: recipe.id,
-            title: recipe.title,
-            description: recipe.description,
-            media: recipe.media.map(m => ({
-                id: m.id,
-                sortOrder: m.sortOrder,
-                mediaType: m.mediaType,
-                mediaUrl: m.mediaUrl,
-                createdAt: m.createdAt,
-                updatedAt: m.updatedAt,
-            })),
-            difficulty: recipe.difficulty,
-            createdAt: recipe.createdAt,
-            updatedAt: recipe.updatedAt,
-            isPublished: recipe.isPublished,
-            author: {
-                id: recipe.author.id,
-                username: recipe.author.username,
-                firstName: recipe.author.firstName,
-                lastName: recipe.author.lastName,
-                about: recipe.author.about,
-                role: recipe.author.role,
-                createdAt: recipe.author.createdAt,
-                updatedAt: recipe.author.updatedAt,
-            },
-        }));
+        return subscriptions.map(s => s.subscribedToId);
     }
 
     static async isSubscribed(currentUserId: number, userId: number): Promise<IsSubscribedToUserReadType> {

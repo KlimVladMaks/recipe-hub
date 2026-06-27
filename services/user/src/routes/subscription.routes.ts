@@ -14,9 +14,9 @@ subscriptionRouter.get('/users/me/subscribers',
     SubscriptionController.getCurrentUserSubscribers
 );
 
-subscriptionRouter.get('/users/me/feed',
+subscriptionRouter.get('/users/me/subscribed-author-ids',
     authMiddleware,
-    SubscriptionController.getFeed
+    SubscriptionController.getSubscribedAuthorIds
 );
 
 subscriptionRouter.get('/users/:userId/subscribe',

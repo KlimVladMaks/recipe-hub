@@ -19,4 +19,6 @@ export const config = {
     },
     xUserId: process.env.X_USER_ID as string,
     xUserRole: process.env.X_USER_ROLE as string,
+    userServiceUrl: process.env.USER_SERVICE_URL || 'http://user-service:3001',
+    rabbitmqUrl: process.env.RABBITMQ_URL || 'amqp://guest:guest@rabbitmq:5672',
 }

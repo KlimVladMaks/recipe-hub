@@ -1,4 +1,16 @@
 services:
+  rabbitmq:
+    image: rabbitmq:4.0-management-alpine
+    container_name: recipe-hub-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   user-db:
     image: postgres:18.3-alpine
     container_name: user-db
@@ -39,8 +51,13 @@ services:
     build: ./services/recipe
     env_file:
       - ./services/recipe/.env
+    environment:
+      USER_SERVICE_URL: http://user-service:3001
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     depends_on:
       recipe-db:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     restart: on-failure
 
@@ -48,8 +65,12 @@ services:
     build: ./services/user
     env_file:
       - ./services/user/.env
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     depends_on:
       user-db:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     restart: on-failure
   

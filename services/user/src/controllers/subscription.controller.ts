@@ -54,16 +54,11 @@ export class SubscriptionController {
         };
     }
 
-    static async getFeed(req: AuthRequest, res: Response) {
+    static async getSubscribedAuthorIds(req: AuthRequest, res: Response) {
         try {
             const currentUserId = req.currentUserId!;
-            const { page, limit } = SubscriptionController.parseQueryParams(req);
-            const feed = await SubscriptionService.getFeed(
-                currentUserId,
-                page,
-                limit
-            );
-            res.status(200).json(feed);
+            const authorIds = await SubscriptionService.getSubscribedAuthorIds(currentUserId);
+            res.status(200).json({ authorIds });
         } catch (error: any) {
             res.status(400).json({
                 message: error.message,

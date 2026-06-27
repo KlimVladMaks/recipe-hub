@@ -9,6 +9,7 @@ import {
 import { prisma } from '../config/database.js';
 import { config } from '../config/index.js';
 import { Role } from '@prisma/client';
+import { publishUserCreated } from './rabbitmq.service.js';
 
 
 export class AuthService {
@@ -30,6 +31,19 @@ export class AuthService {
                 about: about || null
             },
         });
+
+        // Публикуем событие о создании пользователя в RabbitMQ
+        await publishUserCreated({
+            id: user.id,
+            username: user.username,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            about: user.about,
+            role: user.role,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+        });
+
         return user;
     }
 

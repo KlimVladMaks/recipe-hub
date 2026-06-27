@@ -28,6 +28,9 @@ router.use('/users/me/saved-recipes', authMiddleware, createProxy(config.service
 router.use('/users/:userId/recipes', authMiddleware, createProxy(config.service_urls.recipe));
 router.use('/users/:userId/saved-recipes', authMiddleware, createProxy(config.service_urls.recipe));
 
+// Feed — прокси на recipe-service (authorIds передаются как query-параметр)
+router.use('/users/me/feed', authMiddleware, createProxy(config.service_urls.recipe));
+
 
 // ========== USER SERVICE ==========
 

@@ -15,4 +15,5 @@ export const config = {
         secret: process.env.JWT_SECRET as string,
         expiresIn: "1d"
     },
+    rabbitmqUrl: process.env.RABBITMQ_URL || 'amqp://guest:guest@rabbitmq:5672',
 }
