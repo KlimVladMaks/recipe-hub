@@ -15,6 +15,15 @@ export const createApp = () => {
 
     app.use(morgan('dev'));
     app.use(express.json());
+
+    app.get('/health', (req, res) => {
+        res.status(200).json({
+            status: 'OK', 
+            timestamp: new Date().toISOString(),
+            uptime: process.uptime()
+        })
+    });
+
     app.use('/api', routes);
     app.use(errorHandler);
     return app;

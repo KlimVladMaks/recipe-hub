@@ -1,10 +1,11 @@
 import type { Request, Response, NextFunction } from 'express';
-
+import jwt from 'jsonwebtoken';
 import { config } from '../config';
-
+import type { UserReadType } from '../schemas/user.schemas';
 
 export interface AuthRequest extends Request {
     currentUserId?: number;
+    currentUser?: UserReadType;
 }
 
 
@@ -13,13 +14,30 @@ export const authMiddleware = (
     res: Response,
     next: NextFunction
 ) => {
-    const currentUserId = req.headers[config.xUserId];
-    if (currentUserId) {
-        req.currentUserId = Number(currentUserId);
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        res.status(401).json({ 
+            message: 'JWT-токен не предоставлен',
+        });
+        return;
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    if (!token) {
+        res.status(401).json({ 
+            message: 'Некорректный формат JWT-токена',
+        });
+        return;
+    }
+
+    try {
+        const decoded = jwt.verify(token, config.jwt.secret) as { currentUserId: number };
+        req.currentUserId = decoded.currentUserId;
         next();
-    } else {
-        res.status(500).json({ 
-            message: 'user-service: Нет заголовка x-user-id' 
+    } catch (error) {
+        res.status(401).json({ 
+            message: 'Недействительный JWT-токен' 
         });
     }
-}
+};

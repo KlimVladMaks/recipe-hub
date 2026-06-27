@@ -1,9 +1,6 @@
 import { z } from 'zod'
 
 
-// ========== DishType ==========
-
-
 export const DishTypeReadSchema = z.object({
     id: z.number(),
     title: z.string(),
@@ -25,9 +22,6 @@ export const DishTypeUpdateSchema = z.object({
     title: z.string(),
 });
 export type DishTypeUpdateType = z.infer<typeof DishTypeUpdateSchema>;
-
-
-// ========== Ingredient ==========
 
 
 export const IngredientReadSchema = z.object({

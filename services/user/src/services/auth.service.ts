@@ -1,13 +1,14 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
-import { prisma } from "../config/database";
 import { 
-    ChangePasswordRequestType, 
-    LoginRequestType, 
-    RegisterRequestType 
-} from "../schemas/auth.schemas";
-import { config } from "../config";
+    type ChangePasswordRequestType, 
+    type LoginRequestType, 
+    type RegisterRequestType 
+} from "../schemas/auth.schemas.js";
+import { prisma } from '../config/database.js';
+import { config } from '../config/index.js';
+import { Role } from '@prisma/client';
 
 
 export class AuthService {
@@ -34,24 +35,25 @@ export class AuthService {
 
     static async login(loginRequestData: LoginRequestType) {
         const { username, password } = loginRequestData;
+
         const user = await prisma.user.findUnique({
             where: { username },
         });
         if (!user) {
             throw new Error('Неверное имя пользователя или пароль');
         }
+
         const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
         if (!isPasswordValid) {
             throw new Error('Неверное имя пользователя или пароль');
         }
+
         const token = jwt.sign(
-            { 
-                currentUserId: user.id,
-                userRole: user.role
-            }, 
-            config.jwt.secret,
+            { currentUserId: user.id }, 
+            config.jwt.secret, 
             { expiresIn: config.jwt.expiresIn } as jwt.SignOptions
         );
+
         return { 
             user: user, 
             jwtToken: token,
@@ -79,5 +81,15 @@ export class AuthService {
         });
 
         return;
+    }
+
+    static async isUserAdmin(userId: number) {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+        });
+        if (!user) {
+            throw new Error('isUserAdmin: Пользователь не найден');
+        }
+        return user.role === Role.admin;
     }
 }
