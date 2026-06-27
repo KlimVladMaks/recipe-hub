@@ -6,7 +6,7 @@ import {
     isAdmin 
 } from '../middleware/auth.middleware';
 import { DirectoryController } from '../controllers/directory.controller';
-import { DishTypeCreateSchema, DishTypeUpdateSchema, IngredientCreateSchema, IngredientUpdateSchema } from '../schemas/directory.schemas';
+import { DishTypeCreateSchema } from '../schemas/directory.schemas';
 
 setGlobalOptions({
     missingSchemaBehavior: 'any'
@@ -26,60 +26,6 @@ directoryRouter.post('/dish-types',
         body: DishTypeCreateSchema
     }),
     DirectoryController.addDishType
-);
-
-directoryRouter.get('/dish-types/:dishTypeId',
-    authMiddleware,
-    DirectoryController.getDishType
-);
-
-directoryRouter.patch('/dish-types/:dishTypeId',
-    authMiddleware,
-    isAdmin,
-    validate({
-        body: DishTypeUpdateSchema
-    }),
-    DirectoryController.updateDishType
-);
-
-directoryRouter.delete('/dish-types/:dishTypeId',
-    authMiddleware,
-    isAdmin,
-    DirectoryController.deleteDishType
-);
-
-directoryRouter.get('/ingredients',
-    authMiddleware,
-    DirectoryController.getIngredients
-);
-
-directoryRouter.post('/ingredients',
-    authMiddleware,
-    isAdmin,
-    validate({
-        body: IngredientCreateSchema
-    }),
-    DirectoryController.addIngredient
-);
-
-directoryRouter.get('/ingredients/:ingredientId',
-    authMiddleware,
-    DirectoryController.getIngredient
-);
-
-directoryRouter.patch('/ingredients/:ingredientId',
-    authMiddleware,
-    isAdmin,
-    validate({
-        body: IngredientUpdateSchema
-    }),
-    DirectoryController.updateIngredient
-);
-
-directoryRouter.delete('/ingredients/:ingredientId',
-    authMiddleware,
-    isAdmin,
-    DirectoryController.deleteIngredient
 );
 
 export default directoryRouter;
