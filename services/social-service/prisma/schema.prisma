@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  recipeId  Int      @map("recipe_id")
+  text      String   @db.Text
+  createdAt DateTime @map("created_at") @default(now())
+  updatedAt DateTime @map("updated_at") @updatedAt
+
+  likes CommentLike[]
+
+  @@map("comments")
+}
+
+model CommentLike {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  commentId Int      @map("comment_id")
+  likedAt   DateTime @map("liked_at") @default(now())
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId])
+  @@map("comment_likes")
+}
+
+model Subscription {
+  id             Int      @id @default(autoincrement())
+  subscriberId   Int      @map("subscriber_id")
+  subscribedToId Int      @map("subscribed_to_id")
+  subscribedAt   DateTime @map("subscribed_at") @default(now())
+
+  @@unique([subscriberId, subscribedToId])
+  @@map("subscriptions")
+}

@@ -1,0 +1,190 @@
+version: '3.8'
+
+services:
+  # ========== Databases ==========
+  auth-db:
+    image: postgres:18.3-alpine
+    container_name: auth_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: auth_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - auth_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  recipe-db:
+    image: postgres:18.3-alpine
+    container_name: recipe_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: recipe_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - recipe_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d recipe_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  directory-db:
+    image: postgres:18.3-alpine
+    container_name: directory_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: directory_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - directory_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d directory_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  social-db:
+    image: postgres:18.3-alpine
+    container_name: social_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: social_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - social_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d social_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ========== RabbitMQ ==========
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    container_name: recipe_rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ========== Microservices ==========
+  auth-service:
+    build: ./services/auth-service
+    container_name: auth_service
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgresql://user:password@auth-db:5432/auth_db?schema=public
+      JWT_SECRET: my-super-secret-key-change-in-production
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    command: sh -c "npx prisma db push 2>/dev/null; npx tsx src/server.ts"
+
+  directory-service:
+    build: ./services/directory-service
+    container_name: directory_service
+    ports:
+      - "3003:3003"
+    environment:
+      PORT: 3003
+      DATABASE_URL: postgresql://user:password@directory-db:5432/directory_db?schema=public
+      JWT_SECRET: my-super-secret-key-change-in-production
+      AUTH_SERVICE_HOST: auth-service
+      AUTH_SERVICE_PORT: 3001
+    depends_on:
+      directory-db:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    command: sh -c "npx prisma db push 2>/dev/null; npx tsx src/server.ts"
+
+  recipe-service:
+    build: ./services/recipe-service
+    container_name: recipe_service
+    ports:
+      - "3002:3002"
+    environment:
+      PORT: 3002
+      DATABASE_URL: postgresql://user:password@recipe-db:5432/recipe_db?schema=public
+      JWT_SECRET: my-super-secret-key-change-in-production
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      AUTH_SERVICE_HOST: auth-service
+      AUTH_SERVICE_PORT: 3001
+      DIRECTORY_SERVICE_HOST: directory-service
+      DIRECTORY_SERVICE_PORT: 3003
+    depends_on:
+      recipe-db:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      directory-service:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    command: sh -c "npx prisma db push 2>/dev/null; npx tsx src/server.ts"
+
+  social-service:
+    build: ./services/social-service
+    container_name: social_service
+    ports:
+      - "3004:3004"
+    environment:
+      PORT: 3004
+      DATABASE_URL: postgresql://user:password@social-db:5432/social_db?schema=public
+      JWT_SECRET: my-super-secret-key-change-in-production
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      AUTH_SERVICE_HOST: auth-service
+      AUTH_SERVICE_PORT: 3001
+      RECIPE_SERVICE_HOST: recipe-service
+      RECIPE_SERVICE_PORT: 3002
+    depends_on:
+      social-db:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      recipe-service:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    command: sh -c "npx prisma db push 2>/dev/null; npx tsx src/server.ts"
+
+  api-gateway:
+    build: ./services/api-gateway
+    container_name: api_gateway
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      AUTH_SERVICE_URL: http://auth-service:3001
+      RECIPE_SERVICE_URL: http://recipe-service:3002
+      DIRECTORY_SERVICE_URL: http://directory-service:3003
+      SOCIAL_SERVICE_URL: http://social-service:3004
+    depends_on:
+      - auth-service
+      - recipe-service
+      - directory-service
+      - social-service
+
+volumes:
+  auth_pgdata:
+  recipe_pgdata:
+  directory_pgdata:
+  social_pgdata:
