@@ -2,12 +2,13 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
 import { prisma } from "../config/database";
-import { 
-    ChangePasswordRequestType, 
-    LoginRequestType, 
-    RegisterRequestType 
+import {
+    ChangePasswordRequestType,
+    LoginRequestType,
+    RegisterRequestType
 } from "../schemas/auth.schemas";
 import { config } from "../config";
+import { publishUserCreated } from './eventBus.js';
 
 
 export class AuthService {
@@ -29,6 +30,8 @@ export class AuthService {
                 about: about || null
             },
         });
+        // Отправляем событие о создании пользователя
+        publishUserCreated({ id: user.id, username: user.username });
         return user;
     }
 
@@ -79,5 +82,15 @@ export class AuthService {
         });
 
         return;
+    }
+
+    static async isUserAdmin(userId: number) {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+        });
+        if (!user) {
+            throw new Error('isUserAdmin: Пользователь не найден');
+        }
+        return user.role === 'admin';
     }
 }
