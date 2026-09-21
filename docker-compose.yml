@@ -78,6 +78,8 @@ services:
       - "3000:3000"
     env_file:
       - ./services/api-gateway/.env
+    volumes:
+      - ./docs/openapi.yaml:/app/openapi.yaml:ro
     depends_on:
       user-service:
         condition: service_started

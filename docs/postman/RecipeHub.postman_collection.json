@@ -1,0 +1,444 @@
+{
+  "info": {
+    "name": "RecipeHub",
+    "description": "Основной сценарий RecipeHub: регистрация -> вход -> создание рецепта -> шаги -> комментарий и лайк -> рейтинг -> подписка -> персональная лента.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api"
+    }
+  ],
+  "item": [
+    {
+      "name": "Main flow",
+      "item": [
+        {
+          "name": "Register author",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('authorUsername', 'author_' + Date.now());",
+                  "pm.collectionVariables.set('authorPassword', 'password123');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('authorId', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{authorUsername}}\",\n  \"password\": \"{{authorPassword}}\",\n  \"firstName\": \"Иван\",\n  \"lastName\": \"Поваров\",\n  \"about\": \"Люблю готовить\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login author",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('token', body.jwtToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{authorUsername}}\",\n  \"password\": \"{{authorPassword}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get current user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/users/me", "host": ["{{baseUrl}}"], "path": ["users", "me"] }
+          }
+        },
+        {
+          "name": "Create recipe",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('recipeTitle', 'Борщ ' + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('recipeId', body.id);",
+                  "pm.test('author is current user', () => pm.expect(body.author.id).to.eql(pm.collectionVariables.get('authorId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/recipes", "host": ["{{baseUrl}}"], "path": ["recipes"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"{{recipeTitle}}\",\n  \"description\": \"Классический борщ\",\n  \"difficulty\": \"medium\",\n  \"isPublished\": true,\n  \"media\": [\n    { \"sortOrder\": 0, \"mediaType\": \"photo\", \"mediaUrl\": \"https://example.com/borsch.jpg\" }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Add step",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipeId}}/steps",
+              "host": ["{{baseUrl}}"],
+              "path": ["recipes", "{{recipeId}}", "steps"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"number\": 1,\n  \"title\": \"Сварить бульон\",\n  \"description\": \"Варить 2 часа на медленном огне\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get recipe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('returns requested recipe', () => pm.expect(body.id).to.eql(Number(pm.collectionVariables.get('recipeId'))));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["recipes", "{{recipeId}}"]
+            }
+          }
+        },
+        {
+          "name": "Search recipes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('response is paginated', () => pm.expect(body).to.have.property('items'));",
+                  "pm.test('finds created recipe', () => {",
+                  "  const found = body.items.some(r => r.id === Number(pm.collectionVariables.get('recipeId')));",
+                  "  pm.expect(found).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/recipes?search={{recipeTitle}}&difficulty=medium",
+              "host": ["{{baseUrl}}"],
+              "path": ["recipes"],
+              "query": [
+                { "key": "search", "value": "{{recipeTitle}}" },
+                { "key": "difficulty", "value": "medium" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add comment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('commentId', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipeId}}/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["recipes", "{{recipeId}}", "comments"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Отличный рецепт!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Like comment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipeId}}/comments/{{commentId}}/like",
+              "host": ["{{baseUrl}}"],
+              "path": ["recipes", "{{recipeId}}", "comments", "{{commentId}}", "like"]
+            }
+          }
+        },
+        {
+          "name": "Rate recipe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('user rating saved', () => pm.expect(body.userRating).to.eql(9));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipeId}}/rating",
+              "host": ["{{baseUrl}}"],
+              "path": ["recipes", "{{recipeId}}", "rating"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 9\n}"
+            }
+          }
+        },
+        {
+          "name": "Save recipe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipeId}}/save",
+              "host": ["{{baseUrl}}"],
+              "path": ["recipes", "{{recipeId}}", "save"]
+            }
+          }
+        },
+        {
+          "name": "Register reader",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('readerUsername', 'reader_' + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('readerId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{readerUsername}}\",\n  \"password\": \"{{authorPassword}}\",\n  \"firstName\": \"Пётр\",\n  \"lastName\": \"Едок\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login reader",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('token', pm.response.json().jwtToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{readerUsername}}\",\n  \"password\": \"{{authorPassword}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Subscribe to author",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{authorId}}/subscribe",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{authorId}}", "subscribe"]
+            }
+          }
+        },
+        {
+          "name": "Get feed",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('feed is paginated', () => pm.expect(body).to.have.property('items'));",
+                  "pm.test('feed contains author recipe', () => {",
+                  "  const found = body.items.some(r => r.id === Number(pm.collectionVariables.get('recipeId')));",
+                  "  pm.expect(found).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/feed",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me", "feed"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

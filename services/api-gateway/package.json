@@ -11,7 +11,9 @@
     "express": "^5.2.1",
     "http-proxy-middleware": "^4.0.0",
     "jsonwebtoken": "^9.0.3",
-    "morgan": "^1.11.0"
+    "morgan": "^1.11.0",
+    "swagger-ui-express": "^5.0.1",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
@@ -19,6 +21,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/node": "^25.9.1",
+    "@types/swagger-ui-express": "^4.1.8",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3"
   }

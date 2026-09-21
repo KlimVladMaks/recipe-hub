@@ -1,0 +1,1918 @@
+openapi: 3.0.3
+info:
+  title: RecipeHub API
+  version: 2.0.0
+  description: |
+    API сервиса для обмена рецептами и кулинарных блогов (RecipeHub).
+
+    Приложение состоит из трёх микросервисов за API-шлюзом:
+    `api-gateway` (3000), `user` (3001) и `recipe` (3002).
+    Все публичные запросы идут через шлюз по базовому пути `/api`.
+    Шлюз проверяет JWT и прокидывает в сервисы заголовки `x-user-id` и `x-user-role`.
+
+    Разделы `Internal` описывают служебные маршруты для взаимодействия
+    между сервисами. Они доступны только внутри docker-сети и наружу не проксируются.
+
+servers:
+  - url: http://localhost:3000/api
+    description: API-шлюз (локальная разработка)
+
+tags:
+  - name: Auth
+    description: Регистрация, вход и управление паролем
+  - name: Users
+    description: Пользователи
+  - name: Subscriptions
+    description: Подписки на кулинаров и персональная лента
+  - name: Directory
+    description: Справочники типов блюд и ингредиентов
+  - name: Recipes
+    description: Рецепты, рейтинги и сохранение
+  - name: Steps
+    description: Пошаговые инструкции рецепта
+  - name: Comments
+    description: Комментарии к рецептам и лайки
+  - name: Internal
+    description: Служебные маршруты между сервисами (недоступны снаружи)
+
+paths:
+  # ==================== Auth ====================
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Регистрация пользователя
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Пользователь зарегистрирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Авторизация пользователя (получение JWT)
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Пользователь авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/me/password:
+    patch:
+      tags: [Auth]
+      summary: Смена пароля текущего пользователя
+      operationId: changePassword
+      security:
+        - JWTAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Пароль изменён
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==================== Users ====================
+
+  /users:
+    get:
+      tags: [Users]
+      summary: Список пользователей (только администратор)
+      operationId: getUsers
+      security:
+        - JWTAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Страница пользователей
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUsers'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Текущий пользователь
+      operationId: getCurrentUser
+      security:
+        - JWTAuth: []
+      responses:
+        '200':
+          description: Данные текущего пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [Users]
+      summary: Обновить текущего пользователя
+      operationId: updateCurrentUser
+      security:
+        - JWTAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: Обновлённый пользователь
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Users]
+      summary: Удалить текущего пользователя
+      description: Удаляет пользователя и каскадно его данные в recipe-service (через RabbitMQ).
+      operationId: deleteCurrentUser
+      security:
+        - JWTAuth: []
+      responses:
+        '204':
+          description: Пользователь удалён
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserIdParam'
+    get:
+      tags: [Users]
+      summary: Получить пользователя по id
+      operationId: getUser
+      security:
+        - JWTAuth: []
+      responses:
+        '200':
+          description: Пользователь
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Users]
+      summary: Удалить пользователя (только администратор)
+      operationId: deleteUser
+      security:
+        - JWTAuth: []
+      responses:
+        '204':
+          description: Пользователь удалён
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{userId}/role:
+    parameters:
+      - $ref: '#/components/parameters/UserIdParam'
+    patch:
+      tags: [Users]
+      summary: Изменить роль пользователя (только администратор)
+      operationId: updateUserRole
+      security:
+        - JWTAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRoleUpdate'
+      responses:
+        '200':
+          description: Обновлённый пользователь
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ==================== Subscriptions ====================
+
+  /users/me/subscriptions:
+    get:
+      tags: [Subscriptions]
+      summary: Подписки текущего пользователя
+      operationId: getCurrentUserSubscriptions
+      security:
+        - JWTAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Страница пользователей, на которых подписан текущий пользователь
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUsers'
+
+  /users/me/subscribers:
+    get:
+      tags: [Subscriptions]
+      summary: Подписчики текущего пользователя
+      operationId: getCurrentUserSubscribers
+      security:
+        - JWTAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Страница подписчиков текущего пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUsers'
+
+  /users/{userId}/subscribe:
+    parameters:
+      - $ref: '#/components/parameters/UserIdParam'
+    get:
+      tags: [Subscriptions]
+      summary: Проверить подписку текущего пользователя на пользователя
+      operationId: isSubscribed
+      security:
+        - JWTAuth: []
+      responses:
+        '200':
+          description: Статус подписки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IsSubscribedToUserRead'
+    post:
+      tags: [Subscriptions]
+      summary: Подписаться на пользователя
+      operationId: subscribe
+      security:
+        - JWTAuth: []
+      responses:
+        '200':
+          description: Подписка оформлена
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [Subscriptions]
+      summary: Отписаться от пользователя
+      operationId: unsubscribe
+      security:
+        - JWTAuth: []
+      responses:
+        '204':
+          description: Подписка удалена
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{userId}/subscriptions:
+    parameters:
+      - $ref: '#/components/parameters/UserIdParam'
+    get:
+      tags: [Subscriptions]
+      summary: Подписки пользователя
+      operationId: getUserSubscriptions
+      security:
+        - JWTAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Страница подписок пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUsers'
+
+  /users/{userId}/subscribers:
+    parameters:
+      - $ref: '#/components/parameters/UserIdParam'
+    get:
+      tags: [Subscriptions]
+      summary: Подписчики пользователя
+      operationId: getUserSubscribers
+      security:
+        - JWTAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Страница подписчиков пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUsers'
+
+  /users/me/feed:
+    get:
+      tags: [Subscriptions]
+      summary: Персональная лента рецептов
+      description: |
+        Рецепты авторов, на которых подписан текущий пользователь.
+        Лента собирается API-шлюзом из user-service (подписки) и recipe-service (рецепты).
+      operationId: getFeed
+      security:
+        - JWTAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/DishTypeIdsParam'
+        - $ref: '#/components/parameters/IngredientIdsParam'
+        - $ref: '#/components/parameters/DifficultyParam'
+      responses:
+        '200':
+          description: Страница рецептов из ленты
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRecipes'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  # ==================== Directory ====================
+
+  /dish-types:
+    get:
+      tags: [Directory]
+      summary: Список типов блюд
+      operationId: getDishTypes
+      security:
+        - JWTAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+      responses:
+        '200':
+          description: Страница типов блюд
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDishTypes'
+    post:
+      tags: [Directory]
+      summary: Создать тип блюда (только администратор)
+      operationId: addDishType
+      security:
+        - JWTAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DishTypeCreate'
+      responses:
+        '201':
+          description: Созданный тип блюда
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DishTypeRead'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /dish-types/{dishTypeId}:
+    parameters:
+      - $ref: '#/components/parameters/DishTypeIdParam'
+    get:
+      tags: [Directory]
+      summary: Получить тип блюда
+      operationId: getDishType
+      security:
+        - JWTAuth: []
+      responses:
+        '200':
+          description: Тип блюда
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DishTypeRead'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Directory]
+      summary: Обновить тип блюда (только администратор)
+      operationId: updateDishType
+      security:
+        - JWTAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DishTypeUpdate'
+      responses:
+        '200':
+          description: Обновлённый тип блюда
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DishTypeRead'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Directory]
+      summary: Удалить тип блюда (только администратор)
+      operationId: deleteDishType
+      security:
+        - JWTAuth: []
+      responses:
+        '204':
+          description: Тип блюда удалён
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /ingredients:
+    get:
+      tags: [Directory]
+      summary: Список ингредиентов
+      operationId: getIngredients
+      security:
+        - JWTAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+      responses:
+        '200':
+          description: Страница ингредиентов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedIngredients'
+    post:
+      tags: [Directory]
+      summary: Создать ингредиент (только администратор)
+      operationId: addIngredient
+      security:
+        - JWTAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngredientCreate'
+      responses:
+        '201':
+          description: Созданный ингредиент
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngredientRead'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /ingredients/{ingredientId}:
+    parameters:
+      - $ref: '#/components/parameters/IngredientIdParam'
+    get:
+      tags: [Directory]
+      summary: Получить ингредиент
+      operationId: getIngredient
+      security:
+        - JWTAuth: []
+      responses:
+        '200':
+          description: Ингредиент
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngredientRead'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Directory]
+      summary: Обновить ингредиент (только администратор)
+      operationId: updateIngredient
+      security:
+        - JWTAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngredientUpdate'
+      responses:
+        '200':
+          description: Обновлённый ингредиент
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngredientRead'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Directory]
+      summary: Удалить ингредиент (только администратор)
+      operationId: deleteIngredient
+      security:
+        - JWTAuth: []
+      responses:
+        '204':
+          description: Ингредиент удалён
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==================== Recipes ====================
+
+  /recipes:
+    get:
+      tags: [Recipes]
+      summary: Поиск опубликованных рецептов с фильтрацией
+      operationId: getRecipes
+      security:
+        - JWTAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/DishTypeIdsParam'
+        - $ref: '#/components/parameters/IngredientIdsParam'
+        - $ref: '#/components/parameters/DifficultyParam'
+      responses:
+        '200':
+          description: Страница рецептов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRecipes'
+    post:
+      tags: [Recipes]
+      summary: Создать рецепт
+      operationId: addRecipe
+      security:
+        - JWTAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecipeCreate'
+      responses:
+        '201':
+          description: Созданный рецепт
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeRead'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /recipes/{recipeId}:
+    parameters:
+      - $ref: '#/components/parameters/RecipeIdParam'
+    get:
+      tags: [Recipes]
+      summary: Получить рецепт
+      description: Неопубликованный рецепт доступен только его автору.
+      operationId: getRecipe
+      security:
+        - JWTAuth: []
+      responses:
+        '200':
+          description: Рецепт
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeRead'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Recipes]
+      summary: Обновить рецепт (только автор)
+      operationId: updateRecipe
+      security:
+        - JWTAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecipeUpdate'
+      responses:
+        '200':
+          description: Обновлённый рецепт
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeRead'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Recipes]
+      summary: Удалить рецепт (автор или администратор)
+      operationId: deleteRecipe
+      security:
+        - JWTAuth: []
+      responses:
+        '204':
+          description: Рецепт удалён
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/me/recipes:
+    get:
+      tags: [Recipes]
+      summary: Рецепты текущего пользователя (включая черновики)
+      operationId: getCurrentUserRecipes
+      security:
+        - JWTAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/DishTypeIdsParam'
+        - $ref: '#/components/parameters/IngredientIdsParam'
+        - $ref: '#/components/parameters/DifficultyParam'
+      responses:
+        '200':
+          description: Страница рецептов пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRecipes'
+
+  /users/{userId}/recipes:
+    parameters:
+      - $ref: '#/components/parameters/UserIdParam'
+    get:
+      tags: [Recipes]
+      summary: Опубликованные рецепты пользователя
+      operationId: getUserRecipes
+      security:
+        - JWTAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/DishTypeIdsParam'
+        - $ref: '#/components/parameters/IngredientIdsParam'
+        - $ref: '#/components/parameters/DifficultyParam'
+      responses:
+        '200':
+          description: Страница рецептов пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRecipes'
+
+  /users/me/saved-recipes:
+    get:
+      tags: [Recipes]
+      summary: Сохранённые рецепты текущего пользователя
+      operationId: getCurrentUserSavedRecipes
+      security:
+        - JWTAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/DishTypeIdsParam'
+        - $ref: '#/components/parameters/IngredientIdsParam'
+        - $ref: '#/components/parameters/DifficultyParam'
+      responses:
+        '200':
+          description: Страница сохранённых рецептов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRecipes'
+
+  /users/{userId}/saved-recipes:
+    parameters:
+      - $ref: '#/components/parameters/UserIdParam'
+    get:
+      tags: [Recipes]
+      summary: Публичные сохранённые рецепты пользователя
+      operationId: getUserSavedRecipes
+      security:
+        - JWTAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/DishTypeIdsParam'
+        - $ref: '#/components/parameters/IngredientIdsParam'
+        - $ref: '#/components/parameters/DifficultyParam'
+      responses:
+        '200':
+          description: Страница сохранённых рецептов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRecipes'
+
+  /recipes/{recipeId}/rating:
+    parameters:
+      - $ref: '#/components/parameters/RecipeIdParam'
+    get:
+      tags: [Recipes]
+      summary: Средний рейтинг рецепта и оценка текущего пользователя
+      operationId: getRecipeRating
+      security:
+        - JWTAuth: []
+      responses:
+        '200':
+          description: Рейтинг рецепта
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeRatingRead'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Recipes]
+      summary: Поставить или обновить оценку рецепта
+      operationId: putRecipeRating
+      security:
+        - JWTAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecipeRatingPut'
+      responses:
+        '200':
+          description: Обновлённый рейтинг
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeRatingRead'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Recipes]
+      summary: Удалить свою оценку рецепта
+      operationId: deleteRecipeRating
+      security:
+        - JWTAuth: []
+      responses:
+        '204':
+          description: Оценка удалена
+
+  /recipes/{recipeId}/save:
+    parameters:
+      - $ref: '#/components/parameters/RecipeIdParam'
+    get:
+      tags: [Recipes]
+      summary: Проверить, сохранён ли рецепт текущим пользователем
+      operationId: isRecipeSaved
+      security:
+        - JWTAuth: []
+      responses:
+        '200':
+          description: Статус сохранения
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IsRecipeSavedRead'
+    post:
+      tags: [Recipes]
+      summary: Сохранить рецепт
+      operationId: saveRecipe
+      security:
+        - JWTAuth: []
+      responses:
+        '200':
+          description: Рецепт сохранён
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Recipes]
+      summary: Убрать рецепт из сохранённых
+      operationId: unsaveRecipe
+      security:
+        - JWTAuth: []
+      responses:
+        '200':
+          description: Рецепт убран из сохранённых
+
+  # ==================== Steps ====================
+
+  /recipes/{recipeId}/steps:
+    parameters:
+      - $ref: '#/components/parameters/RecipeIdParam'
+    get:
+      tags: [Steps]
+      summary: Шаги рецепта
+      operationId: getSteps
+      security:
+        - JWTAuth: []
+      responses:
+        '200':
+          description: Список шагов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StepReadList'
+    post:
+      tags: [Steps]
+      summary: Добавить шаг
+      operationId: addStep
+      security:
+        - JWTAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StepCreate'
+      responses:
+        '201':
+          description: Созданный шаг
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StepRead'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /recipes/{recipeId}/steps/{stepId}:
+    parameters:
+      - $ref: '#/components/parameters/RecipeIdParam'
+      - $ref: '#/components/parameters/StepIdParam'
+    get:
+      tags: [Steps]
+      summary: Получить шаг
+      operationId: getStep
+      security:
+        - JWTAuth: []
+      responses:
+        '200':
+          description: Шаг
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StepRead'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Steps]
+      summary: Обновить шаг
+      operationId: updateStep
+      security:
+        - JWTAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StepUpdate'
+      responses:
+        '200':
+          description: Обновлённый шаг
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StepRead'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Steps]
+      summary: Удалить шаг
+      operationId: deleteStep
+      security:
+        - JWTAuth: []
+      responses:
+        '204':
+          description: Шаг удалён
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==================== Comments ====================
+
+  /recipes/{recipeId}/comments:
+    parameters:
+      - $ref: '#/components/parameters/RecipeIdParam'
+    get:
+      tags: [Comments]
+      summary: Комментарии рецепта
+      operationId: getComments
+      security:
+        - JWTAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Страница комментариев
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedComments'
+    post:
+      tags: [Comments]
+      summary: Добавить комментарий
+      operationId: addComment
+      security:
+        - JWTAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentCreate'
+      responses:
+        '201':
+          description: Созданный комментарий
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentRead'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /recipes/{recipeId}/comments/{commentId}:
+    parameters:
+      - $ref: '#/components/parameters/RecipeIdParam'
+      - $ref: '#/components/parameters/CommentIdParam'
+    get:
+      tags: [Comments]
+      summary: Получить комментарий
+      operationId: getComment
+      security:
+        - JWTAuth: []
+      responses:
+        '200':
+          description: Комментарий
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentRead'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Comments]
+      summary: Обновить комментарий (только автор)
+      operationId: updateComment
+      security:
+        - JWTAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentUpdate'
+      responses:
+        '200':
+          description: Обновлённый комментарий
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentRead'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Comments]
+      summary: Удалить комментарий (автор или администратор)
+      operationId: deleteComment
+      security:
+        - JWTAuth: []
+      responses:
+        '204':
+          description: Комментарий удалён
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /recipes/{recipeId}/comments/{commentId}/like:
+    parameters:
+      - $ref: '#/components/parameters/RecipeIdParam'
+      - $ref: '#/components/parameters/CommentIdParam'
+    get:
+      tags: [Comments]
+      summary: Проверить, лайкнут ли комментарий текущим пользователем
+      operationId: isCommentLiked
+      security:
+        - JWTAuth: []
+      responses:
+        '200':
+          description: Статус лайка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IsCommentLikedRead'
+    post:
+      tags: [Comments]
+      summary: Поставить лайк комментарию
+      operationId: likeComment
+      security:
+        - JWTAuth: []
+      responses:
+        '200':
+          description: Лайк поставлен
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Comments]
+      summary: Убрать лайк с комментария
+      operationId: unlikeComment
+      security:
+        - JWTAuth: []
+      responses:
+        '204':
+          description: Лайк убран
+
+  # ==================== Internal ====================
+
+  /internal/users/batch:
+    get:
+      tags: [Internal]
+      summary: Пользователи по списку id
+      operationId: internalGetUsersBatch
+      security: []
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          description: Список id через запятую (например, 1,2,3)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Найденные пользователи
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserReadList'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /internal/users/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserIdParam'
+    get:
+      tags: [Internal]
+      summary: Пользователь по id (для recipe-service)
+      operationId: internalGetUser
+      security: []
+      responses:
+        '200':
+          description: Пользователь
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /internal/users/{userId}/is-admin:
+    parameters:
+      - $ref: '#/components/parameters/UserIdParam'
+    get:
+      tags: [Internal]
+      summary: Проверить, является ли пользователь администратором
+      operationId: internalIsAdmin
+      security: []
+      responses:
+        '200':
+          description: Результат проверки
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  isAdmin:
+                    type: boolean
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /internal/users/{userId}/subscription-ids:
+    parameters:
+      - $ref: '#/components/parameters/UserIdParam'
+    get:
+      tags: [Internal]
+      summary: Id авторов, на которых подписан пользователь (для ленты)
+      operationId: internalGetSubscriptionIds
+      security: []
+      responses:
+        '200':
+          description: Список id
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authorIds:
+                    type: array
+                    items:
+                      type: integer
+
+  /internal/recipes/by-authors:
+    get:
+      tags: [Internal]
+      summary: Рецепты по списку авторов (для ленты)
+      operationId: internalGetRecipesByAuthors
+      security: []
+      parameters:
+        - name: authorIds
+          in: query
+          required: true
+          description: Список id авторов через запятую
+          schema:
+            type: string
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/DishTypeIdsParam'
+        - $ref: '#/components/parameters/IngredientIdsParam'
+        - $ref: '#/components/parameters/DifficultyParam'
+      responses:
+        '200':
+          description: Страница рецептов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRecipes'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+components:
+  securitySchemes:
+    JWTAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT, полученный в POST /auth/login
+
+  parameters:
+    UserIdParam:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    RecipeIdParam:
+      name: recipeId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    StepIdParam:
+      name: stepId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    CommentIdParam:
+      name: commentId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    DishTypeIdParam:
+      name: dishTypeId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    IngredientIdParam:
+      name: ingredientId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    PageParam:
+      name: page
+      in: query
+      required: false
+      description: Номер страницы (начиная с 1)
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      required: false
+      description: Количество элементов на странице
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    SearchParam:
+      name: search
+      in: query
+      required: false
+      description: Поиск по заголовку (частичное совпадение)
+      schema:
+        type: string
+    DishTypeIdsParam:
+      name: dishTypeIds
+      in: query
+      required: false
+      description: ID типов блюд (достаточно совпадения хотя бы с одним)
+      schema:
+        type: array
+        items:
+          type: integer
+      style: form
+      explode: false
+    IngredientIdsParam:
+      name: ingredientIds
+      in: query
+      required: false
+      description: ID ингредиентов (должны присутствовать все указанные)
+      schema:
+        type: array
+        items:
+          type: integer
+      style: form
+      explode: false
+    DifficultyParam:
+      name: difficulty
+      in: query
+      required: false
+      description: Уровень сложности рецепта
+      schema:
+        type: string
+        enum: [easy, medium, hard]
+
+  responses:
+    ValidationError:
+      description: Ошибка валидации запроса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Требуется авторизация
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Недостаточно прав
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: Конфликт данных
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    BadGateway:
+      description: Сервис-зависимость недоступен
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              path:
+                type: string
+              message:
+                type: string
+
+    PaginationMeta:
+      type: object
+      required: [total, page, limit]
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    # ==================== Auth ====================
+
+    RegisterRequest:
+      type: object
+      required: [username, password, firstName, lastName]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        about:
+          type: string
+          nullable: true
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    LoginResponse:
+      type: object
+      required: [user, jwtToken]
+      properties:
+        user:
+          $ref: '#/components/schemas/UserRead'
+        jwtToken:
+          type: string
+
+    ChangePasswordRequest:
+      type: object
+      required: [oldPassword, newPassword]
+      properties:
+        oldPassword:
+          type: string
+        newPassword:
+          type: string
+
+    # ==================== User ====================
+
+    UserRead:
+      type: object
+      required: [id, username, firstName, lastName, role, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        about:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [user, admin]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserReadList:
+      type: array
+      items:
+        $ref: '#/components/schemas/UserRead'
+
+    PaginatedUsers:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              $ref: '#/components/schemas/UserReadList'
+
+    UserUpdate:
+      type: object
+      properties:
+        username:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        about:
+          type: string
+          nullable: true
+
+    UserRoleUpdate:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [user, admin]
+
+    # ==================== Recipe ====================
+
+    Difficulty:
+      type: string
+      enum: [easy, medium, hard]
+
+    MediaType:
+      type: string
+      enum: [photo, video]
+
+    RecipeRead:
+      type: object
+      required: [id, title, dishTypes, ingredients, media, createdAt, updatedAt, isPublished, author]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        dishTypes:
+          $ref: '#/components/schemas/DishTypeReadList'
+        ingredients:
+          $ref: '#/components/schemas/IngredientReadList'
+        description:
+          type: string
+          nullable: true
+        media:
+          $ref: '#/components/schemas/RecipeMediaReadList'
+        difficulty:
+          allOf:
+            - $ref: '#/components/schemas/Difficulty'
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        isPublished:
+          type: boolean
+        author:
+          $ref: '#/components/schemas/UserRead'
+
+    RecipeReadList:
+      type: array
+      items:
+        $ref: '#/components/schemas/RecipeRead'
+
+    PaginatedRecipes:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              $ref: '#/components/schemas/RecipeReadList'
+
+    RecipeCreate:
+      type: object
+      required: [title, isPublished]
+      properties:
+        title:
+          type: string
+        dishTypeIds:
+          type: array
+          items:
+            type: integer
+        ingredientIds:
+          type: array
+          items:
+            type: integer
+        description:
+          type: string
+        media:
+          $ref: '#/components/schemas/RecipeMediaCreateList'
+        difficulty:
+          $ref: '#/components/schemas/Difficulty'
+        isPublished:
+          type: boolean
+
+    RecipeUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        dishTypeIds:
+          type: array
+          items:
+            type: integer
+        ingredientIds:
+          type: array
+          items:
+            type: integer
+        description:
+          type: string
+        media:
+          $ref: '#/components/schemas/RecipeMediaUpdateList'
+        difficulty:
+          $ref: '#/components/schemas/Difficulty'
+        isPublished:
+          type: boolean
+
+    RecipeMediaRead:
+      type: object
+      required: [id, sortOrder, mediaType, mediaUrl, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        sortOrder:
+          type: integer
+        mediaType:
+          $ref: '#/components/schemas/MediaType'
+        mediaUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    RecipeMediaReadList:
+      type: array
+      items:
+        $ref: '#/components/schemas/RecipeMediaRead'
+
+    RecipeMediaCreate:
+      type: object
+      required: [sortOrder, mediaType, mediaUrl]
+      properties:
+        sortOrder:
+          type: integer
+        mediaType:
+          $ref: '#/components/schemas/MediaType'
+        mediaUrl:
+          type: string
+
+    RecipeMediaCreateList:
+      type: array
+      items:
+        $ref: '#/components/schemas/RecipeMediaCreate'
+
+    RecipeMediaUpdate:
+      type: object
+      properties:
+        sortOrder:
+          type: integer
+        mediaType:
+          $ref: '#/components/schemas/MediaType'
+        mediaUrl:
+          type: string
+
+    RecipeMediaUpdateList:
+      type: array
+      items:
+        $ref: '#/components/schemas/RecipeMediaUpdate'
+
+    RecipeRatingRead:
+      type: object
+      required: [avgRating, userRating]
+      properties:
+        avgRating:
+          type: number
+          nullable: true
+        userRating:
+          type: integer
+          nullable: true
+
+    RecipeRatingPut:
+      type: object
+      required: [rating]
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 10
+
+    IsRecipeSavedRead:
+      type: object
+      required: [isSaved]
+      properties:
+        isSaved:
+          type: boolean
+
+    # ==================== Step ====================
+
+    StepRead:
+      type: object
+      required: [id, number, title, media, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        number:
+          type: integer
+        title:
+          type: string
+        media:
+          $ref: '#/components/schemas/StepMediaReadList'
+        description:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    StepReadList:
+      type: array
+      items:
+        $ref: '#/components/schemas/StepRead'
+
+    StepCreate:
+      type: object
+      required: [number, title]
+      properties:
+        number:
+          type: integer
+        title:
+          type: string
+        media:
+          $ref: '#/components/schemas/StepMediaCreateList'
+        description:
+          type: string
+
+    StepUpdate:
+      type: object
+      properties:
+        number:
+          type: integer
+        title:
+          type: string
+        media:
+          $ref: '#/components/schemas/StepMediaUpdateList'
+        description:
+          type: string
+          nullable: true
+
+    StepMediaRead:
+      type: object
+      required: [id, sortOrder, mediaType, mediaUrl, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        sortOrder:
+          type: integer
+        mediaType:
+          $ref: '#/components/schemas/MediaType'
+        mediaUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    StepMediaReadList:
+      type: array
+      items:
+        $ref: '#/components/schemas/StepMediaRead'
+
+    StepMediaCreate:
+      type: object
+      required: [sortOrder, mediaType, mediaUrl]
+      properties:
+        sortOrder:
+          type: integer
+        mediaType:
+          $ref: '#/components/schemas/MediaType'
+        mediaUrl:
+          type: string
+
+    StepMediaCreateList:
+      type: array
+      items:
+        $ref: '#/components/schemas/StepMediaCreate'
+
+    StepMediaUpdate:
+      type: object
+      properties:
+        sortOrder:
+          type: integer
+        mediaType:
+          $ref: '#/components/schemas/MediaType'
+        mediaUrl:
+          type: string
+
+    StepMediaUpdateList:
+      type: array
+      items:
+        $ref: '#/components/schemas/StepMediaUpdate'
+
+    # ==================== Directory ====================
+
+    DishTypeRead:
+      type: object
+      required: [id, title]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+
+    DishTypeReadList:
+      type: array
+      items:
+        $ref: '#/components/schemas/DishTypeRead'
+
+    PaginatedDishTypes:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              $ref: '#/components/schemas/DishTypeReadList'
+
+    DishTypeCreate:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+
+    DishTypeUpdate:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+
+    IngredientRead:
+      type: object
+      required: [id, title]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+
+    IngredientReadList:
+      type: array
+      items:
+        $ref: '#/components/schemas/IngredientRead'
+
+    PaginatedIngredients:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              $ref: '#/components/schemas/IngredientReadList'
+
+    IngredientCreate:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+
+    IngredientUpdate:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+
+    # ==================== Comment ====================
+
+    CommentRead:
+      type: object
+      required: [id, user, text, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        user:
+          $ref: '#/components/schemas/UserRead'
+        text:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CommentReadList:
+      type: array
+      items:
+        $ref: '#/components/schemas/CommentRead'
+
+    PaginatedComments:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              $ref: '#/components/schemas/CommentReadList'
+
+    CommentCreate:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+
+    CommentUpdate:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+
+    IsCommentLikedRead:
+      type: object
+      required: [isLiked]
+      properties:
+        isLiked:
+          type: boolean
+
+    # ==================== Subscription ====================
+
+    IsSubscribedToUserRead:
+      type: object
+      required: [isSubscribed]
+      properties:
+        isSubscribed:
+          type: boolean
