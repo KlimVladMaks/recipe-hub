@@ -48,11 +48,10 @@
 
 ```bash
 docker compose up -d --build
-
-# применить миграции Prisma (один раз после первого запуска)
-docker compose exec user-service npx prisma migrate deploy
-docker compose exec recipe-service npx prisma migrate deploy
 ```
+
+Миграции Prisma применяются автоматически при старте `user-service` и `recipe-service`
+(`prisma migrate deploy` в команде запуска контейнера).
 
 После запуска:
 
@@ -110,6 +109,7 @@ AGENTS.md          # заметки для ИИ-агентов и разрабо
 npx prisma generate
 ```
 
-Миграции контейнерами не применяются автоматически — используйте `prisma migrate deploy`
-внутри соответствующего сервисного контейнера. `DATABASE_URL` в `.env` использует docker-хосты
-(`user-db`, `recipe-db`), поэтому команды Prisma выполняются в контейнере, а не на хосте.
+Миграции применяются автоматически при старте сервисных контейнеров. Вручную (например, после
+изменения схемы) их можно применить командой `npx prisma migrate deploy` внутри контейнера.
+`DATABASE_URL` в `.env` использует docker-хосты (`user-db`, `recipe-db`), поэтому команды Prisma
+выполняются в контейнере, а не на хосте.

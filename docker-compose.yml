@@ -49,17 +49,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-  
-  recipe-service:
-    build: ./services/recipe
-    env_file:
-      - ./services/recipe/.env
-    depends_on:
-      recipe-db:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    restart: on-failure
 
   user-service:
     build: ./services/user
@@ -71,7 +60,30 @@ services:
       rabbitmq:
         condition: service_healthy
     restart: on-failure
-  
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3001/api/user-service-health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  recipe-service:
+    build: ./services/recipe
+    env_file:
+      - ./services/recipe/.env
+    depends_on:
+      recipe-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3002/api/recipe-service-health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   api-gateway:
     build: ./services/api-gateway
     ports:
@@ -82,11 +94,17 @@ services:
       - ./docs/openapi.yaml:/app/openapi.yaml:ro
     depends_on:
       user-service:
-        condition: service_started
+        condition: service_healthy
       recipe-service:
-        condition: service_started
+        condition: service_healthy
     restart: on-failure
-  
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/api/api-gateway-health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   prisma-studio-user:
     build: ./services/user
     container_name: prisma-studio-user
@@ -102,7 +120,7 @@ services:
         condition: service_healthy
     profiles:
       - prisma-studio
-  
+
   prisma-studio-recipe:
     build: ./services/recipe
     container_name: prisma-studio-recipe
