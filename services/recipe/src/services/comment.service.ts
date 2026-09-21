@@ -1,6 +1,7 @@
-import { prisma } from "../config/database.js";
-import type { CommentCreateType, CommentUpdateType } from "../schemas/comment.schemas.js";
-import { getUser } from "./userServiceClient.js";
+import { prisma } from '../config/database.js';
+import { NotFoundError } from '../errors.js';
+import type { CommentCreateType, CommentUpdateType } from '../schemas/comment.schemas.js';
+import { getUser } from './userServiceClient.js';
 
 
 export class CommentService {
@@ -22,12 +23,15 @@ export class CommentService {
 
     static async getComments(recipeId: number, page: number, limit: number) {
         const skip = (page - 1) * limit;
-        const comments = await prisma.comment.findMany({
-            where: { recipeId },
-            orderBy: { createdAt: 'desc' },
-            skip,
-            take: limit
-        });
+        const [comments, total] = await Promise.all([
+            prisma.comment.findMany({
+                where: { recipeId },
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit
+            }),
+            prisma.comment.count({ where: { recipeId } }),
+        ]);
 
         // Получаем данные пользователей из user-service
         const userIds = [...new Set(comments.map(c => c.userId))];
@@ -36,13 +40,18 @@ export class CommentService {
         );
         const userMap = new Map(users.filter(u => u).map(u => [u!.id, u]));
 
-        return comments.map(comment => ({
-            id: comment.id,
-            text: comment.text,
-            createdAt: comment.createdAt,
-            updatedAt: comment.updatedAt,
-            user: userMap.get(comment.userId)
-        }));
+        return {
+            items: comments.map(comment => ({
+                id: comment.id,
+                text: comment.text,
+                createdAt: comment.createdAt,
+                updatedAt: comment.updatedAt,
+                user: userMap.get(comment.userId)!
+            })),
+            total,
+            page,
+            limit
+        };
     };
 
     static async createComment(recipeId: number, userId: number, commentCreateData: CommentCreateType) {
@@ -50,7 +59,7 @@ export class CommentService {
             where: { id: recipeId }
         });
         if (!recipe) {
-            throw new Error('Рецепт не найден');
+            throw new NotFoundError('Рецепт не найден');
         }
 
         const comment = await prisma.comment.create({
@@ -78,7 +87,7 @@ export class CommentService {
         });
 
         if (!comment) {
-            throw new Error('Комментарий не найден');
+            throw new NotFoundError('Комментарий не найден');
         }
 
         const user = await getUser(comment.userId);
@@ -97,7 +106,7 @@ export class CommentService {
             where: { id: commentId }
         });
         if (!existing) {
-            throw new Error('Комментарий не найден');
+            throw new NotFoundError('Комментарий не найден');
         }
 
         const updated = await prisma.comment.update({
@@ -121,7 +130,7 @@ export class CommentService {
             where: { id: commentId }
         });
         if (!existing) {
-            throw new Error('Комментарий не найден');
+            throw new NotFoundError('Комментарий не найден');
         }
         await prisma.comment.delete({ where: { id: commentId } });
     };
@@ -143,7 +152,7 @@ export class CommentService {
             where: { id: commentId }
         });
         if (!comment) {
-            throw new Error('Комментарий не найден');
+            throw new NotFoundError('Комментарий не найден');
         }
 
         try {

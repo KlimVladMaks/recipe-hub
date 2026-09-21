@@ -1,16 +1,16 @@
 import { Router } from 'express';
 
-import directoryRouter from './directory.routes';
-import recipeRouter from './recipe.routes';
-import commentRouter from './comment.routes';
-import stepRouter from './step.routes';
-import internalRouter from './internal.routes';
+import directoryRouter from './directory.routes.js';
+import recipeRouter from './recipe.routes.js';
+import commentRouter from './comment.routes.js';
+import stepRouter from './step.routes.js';
+import internalRouter from './internal.routes.js';
 
 const router = Router();
 
 router.get('/recipe-service-health', (_req, res) => {
     res.status(200).json({
-        status: 'recipe-service OK', 
+        status: 'recipe-service OK',
         timestamp: new Date().toISOString(),
         uptime: process.uptime()
     })

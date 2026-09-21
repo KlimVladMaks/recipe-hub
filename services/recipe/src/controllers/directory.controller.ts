@@ -1,157 +1,83 @@
-import { AuthRequest } from '../middleware/auth.middleware';
-import { Response } from 'express'
-import { DirectoryService } from '../services/directory.service';
-import { 
-    DishTypeCreateType, 
-    DishTypeReadListSchema, 
+import type { Response } from 'express'
+import type { AuthRequest } from '../middleware/auth.middleware.js';
+import { parseId, parseLimit, parsePage } from '../errors.js';
+import { DirectoryService } from '../services/directory.service.js';
+import {
+    DishTypeCreateType,
     DishTypeReadSchema,
     DishTypeUpdateType,
     IngredientCreateType,
-    IngredientReadListSchema,
     IngredientReadSchema,
-    IngredientUpdateSchema,
-    IngredientUpdateType
-} from '../schemas/directory.schemas';
+    IngredientUpdateType,
+    PaginatedDishTypesSchema,
+    PaginatedIngredientsSchema,
+} from '../schemas/directory.schemas.js';
 
 
 export class DirectoryController {
     static async getDishTypes(req: AuthRequest, res: Response) {
-        try {
-            const { 
-                page:pageStr='1', 
-                limit:limitStr='20',
-                search='',
-            } = req.query;
-            const page = parseInt(pageStr as string);
-            const limit = parseInt(limitStr as string);
-            const dishTypes = await DirectoryService.getDishTypes(search as string, page, limit);
-            res.status(200).json(DishTypeReadListSchema.parse(dishTypes));
-        } catch (error: any) {
-            res.status(400).json({
-                message: error.message,
-            });
-        };
+        const search = typeof req.query.search === 'string' ? req.query.search : '';
+        const page = parsePage(req.query.page);
+        const limit = parseLimit(req.query.limit);
+        const dishTypes = await DirectoryService.getDishTypes(search, page, limit);
+        res.status(200).json(PaginatedDishTypesSchema.parse(dishTypes));
     };
 
     static async addDishType(req: AuthRequest, res: Response) {
-        try {
-            const dishTypeCreateData: DishTypeCreateType = req.body;
-            const dishType = await DirectoryService.createDishType(dishTypeCreateData);
-            res.status(201).json(DishTypeReadSchema.parse(dishType));
-        } catch (error: any) {
-            res.status(400).json({
-                message: error.message,
-            });
-        };
+        const dishTypeCreateData: DishTypeCreateType = req.body;
+        const dishType = await DirectoryService.createDishType(dishTypeCreateData);
+        res.status(201).json(DishTypeReadSchema.parse(dishType));
     };
 
     static async getDishType(req: AuthRequest, res: Response) {
-        try {
-            const { dishTypeId:dishTypeIdStr } = req.params;
-            const dishTypeId = parseInt(dishTypeIdStr as string);
-            const dishType = await DirectoryService.getDishType(dishTypeId);
-            res.status(200).json(DishTypeReadSchema.parse(dishType))
-        } catch (error: any) {
-            res.status(400).json({
-                message: error.message,
-            });
-        };
+        const dishTypeId = parseId(req.params.dishTypeId, 'dishTypeId');
+        const dishType = await DirectoryService.getDishType(dishTypeId);
+        res.status(200).json(DishTypeReadSchema.parse(dishType))
     };
 
     static async updateDishType(req: AuthRequest, res: Response) {
-        try {
-            const { dishTypeId:dishTypeIdStr } = req.params;
-            const dishTypeId = parseInt(dishTypeIdStr as string);
-            const dishTypeUpdateData: DishTypeUpdateType = req.body;
-            const dishType = await DirectoryService.updateDishType(dishTypeId, dishTypeUpdateData);
-            res.status(200).json(DishTypeReadSchema.parse(dishType));
-        } catch (error: any) {
-            res.status(400).json({
-                message: error.message,
-            });
-        };
+        const dishTypeId = parseId(req.params.dishTypeId, 'dishTypeId');
+        const dishTypeUpdateData: DishTypeUpdateType = req.body;
+        const dishType = await DirectoryService.updateDishType(dishTypeId, dishTypeUpdateData);
+        res.status(200).json(DishTypeReadSchema.parse(dishType));
     };
 
     static async deleteDishType(req: AuthRequest, res: Response) {
-        try {
-            const { dishTypeId:dishTypeIdStr } = req.params;
-            const dishTypeId = parseInt(dishTypeIdStr as string);
-            await DirectoryService.deleteDishType(dishTypeId);
-            res.status(204).send();
-        } catch (error: any) {
-            res.status(400).json({
-                message: error.message,
-            });
-        };
+        const dishTypeId = parseId(req.params.dishTypeId, 'dishTypeId');
+        await DirectoryService.deleteDishType(dishTypeId);
+        res.status(204).send();
     };
 
     static async getIngredients(req: AuthRequest, res: Response) {
-        try {
-            const { 
-                page:pageStr='1', 
-                limit:limitStr='20',
-                search='',
-            } = req.query;
-            const page = parseInt(pageStr as string);
-            const limit = parseInt(limitStr as string);
-            const ingredients = await DirectoryService.getIngredients(search as string, page, limit);
-            res.status(200).json(IngredientReadListSchema.parse(ingredients));
-        } catch (error: any) {
-            res.status(400).json({
-                message: error.message,
-            });
-        };
+        const search = typeof req.query.search === 'string' ? req.query.search : '';
+        const page = parsePage(req.query.page);
+        const limit = parseLimit(req.query.limit);
+        const ingredients = await DirectoryService.getIngredients(search, page, limit);
+        res.status(200).json(PaginatedIngredientsSchema.parse(ingredients));
     };
 
     static async addIngredient(req: AuthRequest, res: Response) {
-        try {
-            const ingredientCreateData: IngredientCreateType = req.body;
-            const ingredient = await DirectoryService.createIngredient(ingredientCreateData);
-            res.status(201).json(IngredientReadSchema.parse(ingredient));
-        } catch (error: any) {
-            res.status(400).json({
-                message: error.message,
-            });
-        };
+        const ingredientCreateData: IngredientCreateType = req.body;
+        const ingredient = await DirectoryService.createIngredient(ingredientCreateData);
+        res.status(201).json(IngredientReadSchema.parse(ingredient));
     };
 
     static async getIngredient(req: AuthRequest, res: Response) {
-        try {
-            const { ingredientId:ingredientIdStr } = req.params;
-            const ingredientId = parseInt(ingredientIdStr as string);
-            const ingredient = await DirectoryService.getIngredient(ingredientId);
-            res.status(200).json(IngredientReadSchema.parse(ingredient))
-        } catch (error: any) {
-            res.status(400).json({
-                message: error.message,
-            });
-        };
+        const ingredientId = parseId(req.params.ingredientId, 'ingredientId');
+        const ingredient = await DirectoryService.getIngredient(ingredientId);
+        res.status(200).json(IngredientReadSchema.parse(ingredient))
     };
 
     static async updateIngredient(req: AuthRequest, res: Response) {
-        try {
-            const { ingredientId:ingredientIdStr } = req.params;
-            const ingredientId = parseInt(ingredientIdStr as string);
-            const ingredientUpdateData: IngredientUpdateType = req.body;
-            const ingredient = await DirectoryService.updateIngredient(ingredientId, ingredientUpdateData);
-            res.status(200).json(IngredientUpdateSchema.parse(ingredient));
-        } catch (error: any) {
-            res.status(400).json({
-                message: error.message,
-            });
-        };
+        const ingredientId = parseId(req.params.ingredientId, 'ingredientId');
+        const ingredientUpdateData: IngredientUpdateType = req.body;
+        const ingredient = await DirectoryService.updateIngredient(ingredientId, ingredientUpdateData);
+        res.status(200).json(IngredientReadSchema.parse(ingredient));
     };
 
     static async deleteIngredient(req: AuthRequest, res: Response) {
-        try {
-            const { ingredientId:ingredientIdStr } = req.params;
-            const ingredientId = parseInt(ingredientIdStr as string);
-            await DirectoryService.deleteIngredient(ingredientId);
-            res.status(204).send();
-        } catch (error: any) {
-            res.status(400).json({
-                message: error.message,
-            });
-        };
+        const ingredientId = parseId(req.params.ingredientId, 'ingredientId');
+        await DirectoryService.deleteIngredient(ingredientId);
+        res.status(204).send();
     };
 };

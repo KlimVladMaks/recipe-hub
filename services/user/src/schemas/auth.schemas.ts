@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { UserReadSchema } from './user.schemas';
+import { UserReadSchema } from './user.schemas.js';
 
 
 export const RegisterRequestSchema = z.object({

@@ -1,28 +1,24 @@
-import { prisma } from "../config/database";
-import { 
-    DishTypeCreateType, 
-    DishTypeUpdateType, 
+import { prisma } from '../config/database.js';
+import { ConflictError, NotFoundError } from '../errors.js';
+import {
+    DishTypeCreateType,
+    DishTypeUpdateType,
     IngredientCreateType,
     IngredientUpdateType
-} from "../schemas/directory.schemas";
+} from '../schemas/directory.schemas.js';
 
 
 export class DirectoryService {
     static async getDishTypes(search: string, page: number, limit: number) {
-        const whereCondition: any = {};
-        if (search.trim().length > 0) {
-            whereCondition.title = {
-                contains: search.trim(),
-                mode: 'insensitive'
-            };
-        };
+        const where = search.trim().length > 0
+            ? { title: { contains: search.trim(), mode: 'insensitive' as const } }
+            : {};
         const skip = (page - 1) * limit;
-        const dishTypes = await prisma.dishType.findMany({
-            skip: skip,
-            take: limit,
-            where: whereCondition
-        });
-        return dishTypes;
+        const [items, total] = await Promise.all([
+            prisma.dishType.findMany({ skip, take: limit, where }),
+            prisma.dishType.count({ where }),
+        ]);
+        return { items, total, page, limit };
     };
 
     static async createDishType(dishTypeCreateData: DishTypeCreateType) {
@@ -31,7 +27,7 @@ export class DirectoryService {
             where: { title },
         });
         if (existingDishType) {
-            throw new Error('Тип блюда с таким названием уже существует');
+            throw new ConflictError('Тип блюда с таким названием уже существует');
         };
         const dishType = await prisma.dishType.create({
             data: {
@@ -46,7 +42,7 @@ export class DirectoryService {
             where: { id: dishTypeId }
         });
         if (!dishType) {
-            throw new Error('Тип блюда не найден');
+            throw new NotFoundError('Тип блюда не найден');
         };
         return dishType;
     };
@@ -56,7 +52,7 @@ export class DirectoryService {
             where: { id: dishTypeId }
         });
         if (!dishType) {
-            throw new Error('Тип блюда не найден');
+            throw new NotFoundError('Тип блюда не найден');
         };
         const { title } = dishTypeUpdateData;
         const updatedDishType = await prisma.dishType.update({
@@ -71,7 +67,7 @@ export class DirectoryService {
             where: { id: dishTypeId }
         });
         if (!dishType) {
-            throw new Error('Тип блюда не найден');
+            throw new NotFoundError('Тип блюда не найден');
         };
         await prisma.dishType.delete({
             where: { id: dishTypeId }
@@ -79,20 +75,15 @@ export class DirectoryService {
     };
 
     static async getIngredients(search: string, page: number, limit: number) {
-        const whereCondition: any = {};
-        if (search.trim().length > 0) {
-            whereCondition.title = {
-                contains: search.trim(),
-                mode: 'insensitive'
-            };
-        };
+        const where = search.trim().length > 0
+            ? { title: { contains: search.trim(), mode: 'insensitive' as const } }
+            : {};
         const skip = (page - 1) * limit;
-        const ingredients = await prisma.ingredient.findMany({
-            skip: skip,
-            take: limit,
-            where: whereCondition
-        });
-        return ingredients;
+        const [items, total] = await Promise.all([
+            prisma.ingredient.findMany({ skip, take: limit, where }),
+            prisma.ingredient.count({ where }),
+        ]);
+        return { items, total, page, limit };
     };
 
     static async createIngredient(ingredientCreateData: IngredientCreateType) {
@@ -101,7 +92,7 @@ export class DirectoryService {
             where: { title },
         });
         if (existingIngredient) {
-            throw new Error('Тип блюда с таким названием уже существует');
+            throw new ConflictError('Ингредиент с таким названием уже существует');
         };
         const ingredient = await prisma.ingredient.create({
             data: {
@@ -116,7 +107,7 @@ export class DirectoryService {
             where: { id: ingredientId }
         });
         if (!ingredient) {
-            throw new Error('Тип блюда не найден');
+            throw new NotFoundError('Ингредиент не найден');
         };
         return ingredient;
     };
@@ -126,7 +117,7 @@ export class DirectoryService {
             where: { id: ingredientId }
         });
         if (!ingredient) {
-            throw new Error('Тип блюда не найден');
+            throw new NotFoundError('Ингредиент не найден');
         };
         const { title } = ingredientUpdateData;
         const updatedIngredient = await prisma.ingredient.update({
@@ -141,7 +132,7 @@ export class DirectoryService {
             where: { id: ingredientId }
         });
         if (!ingredient) {
-            throw new Error('Тип блюда не найден');
+            throw new NotFoundError('Ингредиент не найден');
         };
         await prisma.ingredient.delete({
             where: { id: ingredientId }

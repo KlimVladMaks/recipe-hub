@@ -1,13 +1,14 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
-import { prisma } from "../config/database";
+import { prisma } from '../config/database.js';
+import { config } from '../config/index.js';
+import { BadRequestError, ConflictError, NotFoundError, UnauthorizedError } from '../errors.js';
 import {
     ChangePasswordRequestType,
     LoginRequestType,
     RegisterRequestType
-} from "../schemas/auth.schemas";
-import { config } from "../config";
+} from '../schemas/auth.schemas.js';
 import { publishUserCreated } from './eventBus.js';
 
 
@@ -18,7 +19,7 @@ export class AuthService {
             where: { username },
         });
         if (existingUser) {
-            throw new Error('Пользователь с таким именем уже существует');
+            throw new ConflictError('Пользователь с таким именем уже существует');
         }
         const passwordHash = await bcrypt.hash(password, 10);
         const user = await prisma.user.create({
@@ -41,22 +42,22 @@ export class AuthService {
             where: { username },
         });
         if (!user) {
-            throw new Error('Неверное имя пользователя или пароль');
+            throw new UnauthorizedError('Неверное имя пользователя или пароль');
         }
         const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
         if (!isPasswordValid) {
-            throw new Error('Неверное имя пользователя или пароль');
+            throw new UnauthorizedError('Неверное имя пользователя или пароль');
         }
         const token = jwt.sign(
-            { 
+            {
                 currentUserId: user.id,
                 userRole: user.role
-            }, 
+            },
             config.jwt.secret,
             { expiresIn: config.jwt.expiresIn } as jwt.SignOptions
         );
-        return { 
-            user: user, 
+        return {
+            user: user,
             jwtToken: token,
         }
     }
@@ -67,12 +68,12 @@ export class AuthService {
             where: { id: userId },
         });
         if (!user) {
-            throw new Error('Пользователь не найден');
+            throw new NotFoundError('Пользователь не найден');
         }
 
         const isPasswordValid = await bcrypt.compare(oldPassword, user.passwordHash);
         if (!isPasswordValid) {
-            throw new Error('Старый пароль неверен');
+            throw new BadRequestError('Старый пароль неверен');
         }
 
         const newPasswordHash = await bcrypt.hash(newPassword, 10);
@@ -89,7 +90,7 @@ export class AuthService {
             where: { id: userId },
         });
         if (!user) {
-            throw new Error('isUserAdmin: Пользователь не найден');
+            throw new NotFoundError('isUserAdmin: Пользователь не найден');
         }
         return user.role === 'admin';
     }

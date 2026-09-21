@@ -1,17 +1,13 @@
 import { Router } from 'express';
-import validate, { setGlobalOptions } from 'express-zod-safe';
-import { 
-    authMiddleware
-} from '../middleware/auth.middleware.js';
-import { StepController } from '../controllers/step.controller.js';
-import { 
-    StepCreateSchema, 
-    StepUpdateSchema 
-} from '../schemas/step.schemas.js';
+import validate from 'express-zod-safe';
 
-setGlobalOptions({
-    missingSchemaBehavior: 'any'
-});
+import '../validation.js'
+import { authMiddleware } from '../middleware/auth.middleware.js';
+import { StepController } from '../controllers/step.controller.js';
+import {
+    StepCreateSchema,
+    StepUpdateSchema
+} from '../schemas/step.schemas.js';
 
 const stepRouter = Router();
 

@@ -1,17 +1,14 @@
 import { Router } from 'express'
-import validate, { setGlobalOptions } from 'express-zod-safe';
+import validate from 'express-zod-safe';
+
+import '../validation.js'
 import { authMiddleware } from '../middleware/auth.middleware.js';
 import { RecipeController } from '../controllers/recipe.controller.js';
-import { 
-    RecipeCreateSchema, 
-    RecipeRatingPutSchema, 
-    RecipeUpdateSchema, 
+import {
+    RecipeCreateSchema,
+    RecipeRatingPutSchema,
+    RecipeUpdateSchema,
 } from '../schemas/recipe.schemas.js';
-
-
-setGlobalOptions({
-    missingSchemaBehavior: 'any'
-});
 
 const recipeRouter = Router();
 

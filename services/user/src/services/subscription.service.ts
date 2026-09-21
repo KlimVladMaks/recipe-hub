@@ -1,53 +1,73 @@
 import { prisma } from '../config/database.js';
+import { BadRequestError, ConflictError, NotFoundError } from '../errors.js';
+
+
+const toPublicUser = (user: {
+    id: number;
+    username: string;
+    firstName: string;
+    lastName: string;
+    about: string | null;
+    role: string;
+    createdAt: Date;
+    updatedAt: Date;
+}) => ({
+    id: user.id,
+    username: user.username,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    about: user.about,
+    role: user.role,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+});
 
 
 export class SubscriptionService {
     static async getSubscriptions(userId: number, page: number, limit: number) {
         const skip = (page - 1) * limit;
-        const subscriptions = await prisma.subscription.findMany({
-            where: { subscriberId: userId },
-            include: {
-                subscribedTo: true,
-            },
-            skip,
-            take: limit,
-            orderBy: { subscribedAt: 'desc' },
-        });
+        const [subscriptions, total] = await Promise.all([
+            prisma.subscription.findMany({
+                where: { subscriberId: userId },
+                include: {
+                    subscribedTo: true,
+                },
+                skip,
+                take: limit,
+                orderBy: { subscribedAt: 'desc' },
+            }),
+            prisma.subscription.count({ where: { subscriberId: userId } }),
+        ]);
 
-        return subscriptions.map(sub => ({
-            id: sub.subscribedTo.id,
-            username: sub.subscribedTo.username,
-            firstName: sub.subscribedTo.firstName,
-            lastName: sub.subscribedTo.lastName,
-            about: sub.subscribedTo.about,
-            role: sub.subscribedTo.role,
-            createdAt: sub.subscribedTo.createdAt,
-            updatedAt: sub.subscribedTo.updatedAt,
-        }));
+        return {
+            items: subscriptions.map(sub => toPublicUser(sub.subscribedTo)),
+            total,
+            page,
+            limit,
+        };
     };
 
     static async getSubscribers(userId: number, page: number, limit: number) {
         const skip = (page - 1) * limit;
-        const subscribers = await prisma.subscription.findMany({
-            where: { subscribedToId: userId },
-            include: {
-                subscriber: true,
-            },
-            skip,
-            take: limit,
-            orderBy: { subscribedAt: 'desc' },
-        });
+        const [subscribers, total] = await Promise.all([
+            prisma.subscription.findMany({
+                where: { subscribedToId: userId },
+                include: {
+                    subscriber: true,
+                },
+                skip,
+                take: limit,
+                orderBy: { subscribedAt: 'desc' },
+            }),
+            prisma.subscription.count({ where: { subscribedToId: userId } }),
+        ]);
 
-        return subscribers.map(sub => ({
-            id: sub.subscriber.id,
-            username: sub.subscriber.username,
-            firstName: sub.subscriber.firstName,
-            lastName: sub.subscriber.lastName,
-            about: sub.subscriber.about,
-            role: sub.subscriber.role,
-            createdAt: sub.subscriber.createdAt,
-            updatedAt: sub.subscriber.updatedAt,
-        }));
+        return {
+            items: subscribers.map(sub => toPublicUser(sub.subscriber)),
+            total,
+            page,
+            limit,
+        };
     };
 
     static async getSubscriptionUserIds(userId: number): Promise<number[]> {
@@ -72,7 +92,15 @@ export class SubscriptionService {
 
     static async subscribe(currentUserId: number, userId: number) {
         if (currentUserId === userId) {
-            throw new Error('Нельзя подписаться на самого себя');
+            throw new BadRequestError('Нельзя подписаться на самого себя');
+        }
+
+        const targetUser = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true },
+        });
+        if (!targetUser) {
+            throw new NotFoundError('Пользователь не найден');
         }
 
         const existing = await prisma.subscription.findUnique({
@@ -84,7 +112,7 @@ export class SubscriptionService {
             },
         });
         if (existing) {
-            throw new Error('Уже подписан');
+            throw new ConflictError('Уже подписан');
         }
 
         await prisma.subscription.create({
@@ -105,7 +133,7 @@ export class SubscriptionService {
             },
         });
         if (!subscription) {
-            throw new Error('Подписка не найдена');
+            throw new NotFoundError('Подписка не найдена');
         }
         await prisma.subscription.delete({
             where: {

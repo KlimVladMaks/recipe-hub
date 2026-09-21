@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 
-import { config } from '../config';
+import { config } from '../config/index.js';
+import { ForbiddenError, UnauthorizedError } from '../errors.js';
 
 
 export interface AuthRequest extends Request {
@@ -10,32 +11,29 @@ export interface AuthRequest extends Request {
 
 export const authMiddleware = (
     req: AuthRequest,
-    res: Response,
+    _res: Response,
     next: NextFunction
 ) => {
-    const currentUserId = req.headers[config.xUserId];
-    if (currentUserId) {
-        req.currentUserId = Number(currentUserId);
-        next();
-    } else {
-        res.status(500).json({ 
-            message: 'user-service: Нет заголовка x-user-id' 
-        });
+    const header = req.headers[config.xUserId];
+    const currentUserId = Number(header);
+    if (!header || !Number.isInteger(currentUserId) || currentUserId <= 0) {
+        next(new UnauthorizedError('Не удалось определить пользователя'));
+        return;
     }
+    req.currentUserId = currentUserId;
+    next();
 }
 
 
-export const isAdmin = async (
+export const isAdmin = (
     req: AuthRequest,
-    res: Response,
+    _res: Response,
     next: NextFunction
 ) => {
     const userRole = req.headers[config.xUserRole];
-    if (userRole != "admin") {
-        res.status(403).json({
-            message: "Доступ только для администраторов"
-        })
+    if (userRole !== 'admin') {
+        next(new ForbiddenError('Доступ только для администраторов'));
         return;
-    };
+    }
     next();
 }

@@ -1,6 +1,12 @@
-import type { MediaType } from "../generated/prisma/client";
-import { prisma } from "../config/database.js";
-import type { StepCreateType, StepUpdateType } from "../schemas/step.schemas.js";
+import type { MediaType } from '../generated/prisma/client';
+import { prisma } from '../config/database.js';
+import { NotFoundError } from '../errors.js';
+import type { StepCreateType, StepUpdateType } from '../schemas/step.schemas.js';
+
+const withSortedMedia = <T extends { media: { sortOrder: number }[] }>(step: T) => ({
+    ...step,
+    media: [...step.media].sort((a, b) => a.sortOrder - b.sortOrder),
+});
 
 export class StepService {
     static async getSteps(recipeId: number) {
@@ -13,24 +19,20 @@ export class StepService {
                 },
             },
         });
-        return steps.map(step => ({
-            ...step,
-            media: step.media.map(media => ({
-                ...media,
-                mediaType: media.mediaType,
-            })),
-        }));
+        return steps.map(withSortedMedia);
     };
 
     static async addStep(recipeId: number, stepCreateData: StepCreateType) {
         const { number, title, description, media } = stepCreateData;
-        if (media) {
-            for (const m of media) {
-                if (!['photo', 'video'].includes(m.mediaType)) {
-                    throw new Error(`Некорректный mediaType: ${m.mediaType}. Допустимые значения: photo, video`);
-                }
-            }
+
+        const recipe = await prisma.recipe.findUnique({
+            where: { id: recipeId },
+            select: { id: true },
+        });
+        if (!recipe) {
+            throw new NotFoundError('Рецепт не найден');
         }
+
         const newStep = await prisma.$transaction(async (tx) => {
             const step = await tx.recipeStep.create({
                 data: {
@@ -63,16 +65,10 @@ export class StepService {
         });
 
         if (!newStep) {
-            throw new Error('Не удалось создать шаг');
+            throw new NotFoundError('Не удалось создать шаг');
         }
 
-        return {
-            ...newStep,
-            media: newStep.media.map(m => ({
-                ...m,
-                mediaType: m.mediaType,
-            })),
-        };
+        return withSortedMedia(newStep);
     };
 
     static async getStep(stepId: number) {
@@ -86,27 +82,21 @@ export class StepService {
         });
 
         if (!step) {
-            throw new Error('Шаг не найден');
+            throw new NotFoundError('Шаг не найден');
         }
 
-        return {
-            ...step,
-            media: step.media.map(m => ({
-                ...m,
-                mediaType: m.mediaType,
-            })),
-        };
+        return withSortedMedia(step);
     };
 
     static async updateStep(stepId: number, stepUpdateData: StepUpdateType) {
         const { number, title, description, media } = stepUpdateData;
 
-        if (media) {
-            for (const m of media) {
-                if (m.mediaType && !['photo', 'video'].includes(m.mediaType)) {
-                    throw new Error(`Некорректный mediaType: ${m.mediaType}. Допустимые значения: photo, video`);
-                }
-            }
+        const existing = await prisma.recipeStep.findUnique({
+            where: { id: stepId },
+            select: { id: true },
+        });
+        if (!existing) {
+            throw new NotFoundError('Шаг не найден');
         }
 
         const updatedStep = await prisma.$transaction(async (tx) => {
@@ -115,7 +105,7 @@ export class StepService {
                 title?: string;
                 description?: string | null;
             } = {};
-            
+
             if (number !== undefined) updateData.number = number;
             if (title !== undefined) updateData.title = title;
             if (description !== undefined) updateData.description = description;
@@ -151,19 +141,20 @@ export class StepService {
         });
 
         if (!updatedStep) {
-            throw new Error('Шаг не найден');
+            throw new NotFoundError('Шаг не найден');
         }
 
-        return {
-            ...updatedStep,
-            media: updatedStep.media.map(m => ({
-                ...m,
-                mediaType: m.mediaType,
-            })),
-        };
+        return withSortedMedia(updatedStep);
     }
 
     static async deleteStep(stepId: number) {
+        const existing = await prisma.recipeStep.findUnique({
+            where: { id: stepId },
+            select: { id: true },
+        });
+        if (!existing) {
+            throw new NotFoundError('Шаг не найден');
+        }
         await prisma.recipeStep.delete({
             where: { id: stepId },
         });

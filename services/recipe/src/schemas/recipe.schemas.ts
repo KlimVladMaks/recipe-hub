@@ -1,13 +1,20 @@
 import { z } from 'zod'
 
 
+export const DifficultySchema = z.enum(['easy', 'medium', 'hard']);
+export type DifficultyType = z.infer<typeof DifficultySchema>;
+
+export const MediaTypeSchema = z.enum(['photo', 'video']);
+export type MediaTypeSchemaType = z.infer<typeof MediaTypeSchema>;
+
+
 // ========== RecipeMedia ==========
 
 
 export const RecipeMediaReadSchema = z.object({
     id: z.number(),
     sortOrder: z.number(),
-    mediaType: z.string(),
+    mediaType: MediaTypeSchema,
     mediaUrl: z.string(),
     createdAt: z.date(),
     updatedAt: z.date(),
@@ -21,7 +28,7 @@ export type RecipeMediaReadListType = z.infer<typeof RecipeMediaReadListSchema>;
 
 export const RecipeMediaCreateSchema = z.object({
     sortOrder: z.number(),
-    mediaType: z.string(),
+    mediaType: MediaTypeSchema,
     mediaUrl: z.string(),
 });
 export type RecipeMediaCreateType = z.infer<typeof RecipeMediaCreateSchema>;
@@ -33,7 +40,7 @@ export type RecipeMediaCreateListType = z.infer<typeof RecipeMediaCreateListSche
 
 export const RecipeMediaUpdateSchema = z.object({
     sortOrder: z.number().optional(),
-    mediaType: z.string().optional(),
+    mediaType: MediaTypeSchema.optional(),
     mediaUrl: z.string().optional(),
 });
 export type RecipeMediaUpdateType = z.infer<typeof RecipeMediaUpdateSchema>;
@@ -52,7 +59,7 @@ export const RecipeAuthorSchema = z.object({
     firstName: z.string(),
     lastName: z.string(),
     about: z.string().nullable(),
-    role: z.string(),
+    role: z.enum(['user', 'admin']),
     createdAt: z.date(),
     updatedAt: z.date(),
 });
@@ -75,7 +82,7 @@ export const RecipeReadSchema = z.object({
     })),
     description: z.string().nullable().optional(),
     media: RecipeMediaReadListSchema,
-    difficulty: z.string().nullable().optional(),
+    difficulty: DifficultySchema.nullable().optional(),
     createdAt: z.date(),
     updatedAt: z.date(),
     isPublished: z.boolean(),
@@ -88,13 +95,22 @@ export const RecipeReadListSchema = z.array(RecipeReadSchema);
 export type RecipeReadListType = z.infer<typeof RecipeReadListSchema>;
 
 
+export const PaginatedRecipesSchema = z.object({
+    items: RecipeReadListSchema,
+    total: z.number(),
+    page: z.number(),
+    limit: z.number(),
+});
+export type PaginatedRecipesType = z.infer<typeof PaginatedRecipesSchema>;
+
+
 export const RecipeCreateSchema = z.object({
     title: z.string(),
     dishTypeIds: z.array(z.number()).optional(),
     ingredientIds: z.array(z.number()).optional(),
     description: z.string().optional(),
     media: RecipeMediaCreateListSchema.optional(),
-    difficulty: z.string().optional(),
+    difficulty: DifficultySchema.optional(),
     isPublished: z.boolean(),
 });
 export type RecipeCreateType = z.infer<typeof RecipeCreateSchema>;
@@ -106,7 +122,7 @@ export const RecipeUpdateSchema = z.object({
     ingredientIds: z.array(z.number()).optional(),
     description: z.string().optional(),
     media: RecipeMediaUpdateListSchema.optional(),
-    difficulty: z.string().optional(),
+    difficulty: DifficultySchema.optional(),
     isPublished: z.boolean().optional(),
 });
 export type RecipeUpdateType = z.infer<typeof RecipeUpdateSchema>;
@@ -116,8 +132,8 @@ export type RecipeUpdateType = z.infer<typeof RecipeUpdateSchema>;
 
 
 export const RecipeRatingReadSchema = z.object({
-    avg_rating: z.number().nullable().optional(),
-    rating_by_user: z.number().nullable().optional(),
+    avgRating: z.number().nullable(),
+    userRating: z.number().nullable(),
 });
 export type RecipeRatingReadType = z.infer<typeof RecipeRatingReadSchema>;
 

@@ -1,16 +1,18 @@
 import { Router } from 'express'
 import validate from 'express-zod-safe'
-import { setGlobalOptions } from 'express-zod-safe';
-import { 
-    authMiddleware, 
-    isAdmin 
-} from '../middleware/auth.middleware';
-import { DirectoryController } from '../controllers/directory.controller';
-import { DishTypeCreateSchema, DishTypeUpdateSchema, IngredientCreateSchema, IngredientUpdateSchema } from '../schemas/directory.schemas';
 
-setGlobalOptions({
-    missingSchemaBehavior: 'any'
-});
+import '../validation.js'
+import {
+    authMiddleware,
+    isAdmin
+} from '../middleware/auth.middleware.js';
+import { DirectoryController } from '../controllers/directory.controller.js';
+import {
+    DishTypeCreateSchema,
+    DishTypeUpdateSchema,
+    IngredientCreateSchema,
+    IngredientUpdateSchema
+} from '../schemas/directory.schemas.js';
 
 const directoryRouter = Router();
 

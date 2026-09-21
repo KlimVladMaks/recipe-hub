@@ -1,51 +1,33 @@
 import type { Request, Response } from 'express'
 
-import { 
+import {
     ChangePasswordRequestType,
-    LoginRequestType, 
-    LoginResponseSchema, 
-    RegisterRequestType 
-} from '../schemas/auth.schemas'
-import { AuthService } from '../services/auth.service.js'
+    LoginRequestType,
+    LoginResponseSchema,
+    RegisterRequestType
+} from '../schemas/auth.schemas.js'
 import { UserReadSchema } from '../schemas/user.schemas.js'
-import { AuthRequest } from '../middleware/auth.middleware'
+import { AuthService } from '../services/auth.service.js'
+import { AuthRequest } from '../middleware/auth.middleware.js'
 
 
 export class AuthController {
     static async register(req: Request, res: Response) {
-        try {
-            const registerRequestData: RegisterRequestType = req.body
-            const user = await AuthService.register(registerRequestData)
-            res.status(201).json(UserReadSchema.parse(user))
-        } catch (error: any) {
-            res.status(400).json({
-                message: error.message,
-            });
-        }
+        const registerRequestData: RegisterRequestType = req.body
+        const user = await AuthService.register(registerRequestData)
+        res.status(201).json(UserReadSchema.parse(user))
     }
 
     static async login(req: Request, res: Response) {
-        try {
-            const loginRequestData: LoginRequestType = req.body
-            const result = await AuthService.login(loginRequestData);
-            res.status(200).json(LoginResponseSchema.parse(result));
-        } catch (error: any) {
-            res.status(400).json({
-                message: error.message,
-            });
-        };
+        const loginRequestData: LoginRequestType = req.body
+        const result = await AuthService.login(loginRequestData);
+        res.status(200).json(LoginResponseSchema.parse(result));
     };
 
     static async changePassword(req: AuthRequest, res: Response) {
-        try {
-            const currentUserId = req.currentUserId!;
-            const changePasswordRequestData: ChangePasswordRequestType = req.body;
-            await AuthService.changePassword(currentUserId, changePasswordRequestData);
-            res.status(200).send();
-        } catch (error: any) {
-            res.status(400).json({
-                message: error.message,
-            });
-        }
+        const currentUserId = req.currentUserId!;
+        const changePasswordRequestData: ChangePasswordRequestType = req.body;
+        await AuthService.changePassword(currentUserId, changePasswordRequestData);
+        res.status(200).send();
     }
 }

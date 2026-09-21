@@ -9,7 +9,7 @@ export const CommentReadSchema = z.object({
         firstName: z.string(),
         lastName: z.string(),
         about: z.string().nullable(),
-        role: z.string(),
+        role: z.enum(['user', 'admin']),
         createdAt: z.date(),
         updatedAt: z.date(),
     }),
@@ -22,6 +22,15 @@ export type CommentReadType = z.infer<typeof CommentReadSchema>;
 
 export const CommentReadListSchema = z.array(CommentReadSchema);
 export type CommentReadListType = z.infer<typeof CommentReadListSchema>;
+
+
+export const PaginatedCommentsSchema = z.object({
+    items: CommentReadListSchema,
+    total: z.number(),
+    page: z.number(),
+    limit: z.number(),
+});
+export type PaginatedCommentsType = z.infer<typeof PaginatedCommentsSchema>;
 
 
 export const CommentCreateSchema = z.object({

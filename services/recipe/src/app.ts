@@ -1,17 +1,13 @@
 import express from 'express';
 import morgan from 'morgan';
 
-import routes from './routes';
-import { errorHandler } from './middleware/errorHandler';
+import './validation.js';
+import routes from './routes/index.js';
+import { errorHandler } from './middleware/errorHandler.js';
 
 
 export const createApp = () => {
     const app = express();
-
-    // app.use((req, _res, next) => {
-    //     console.log('Request Body:', req.body);
-    //     next();
-    // });
 
     app.use(morgan('dev'));
     app.use(express.json());

@@ -1,12 +1,15 @@
 import { z } from 'zod'
 
+import { MediaTypeSchema } from './recipe.schemas.js';
+
 
 // ========== StepMedia ==========
 
 
 export const StepMediaReadSchema = z.object({
+    id: z.number(),
     sortOrder: z.number(),
-    mediaType: z.string(),
+    mediaType: MediaTypeSchema,
     mediaUrl: z.string(),
     createdAt: z.date(),
     updatedAt: z.date(),
@@ -20,7 +23,7 @@ export type StepMediaReadListType = z.infer<typeof StepMediaReadListSchema>;
 
 export const StepMediaCreateSchema = z.object({
     sortOrder: z.number(),
-    mediaType: z.string(),
+    mediaType: MediaTypeSchema,
     mediaUrl: z.string(),
 });
 export type StepMediaCreateType = z.infer<typeof StepMediaCreateSchema>;
@@ -32,7 +35,7 @@ export type StepMediaCreateListType = z.infer<typeof StepMediaCreateListSchema>;
 
 export const StepMediaUpdateSchema = z.object({
     sortOrder: z.number().optional(),
-    mediaType: z.string().optional(),
+    mediaType: MediaTypeSchema.optional(),
     mediaUrl: z.string().optional(),
 });
 export type StepMediaUpdateType = z.infer<typeof StepMediaUpdateSchema>;

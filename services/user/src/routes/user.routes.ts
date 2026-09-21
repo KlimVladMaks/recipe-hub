@@ -1,16 +1,13 @@
 import { Router } from 'express';
 import validate from 'express-zod-safe'
+
+import '../validation.js'
 import { authMiddleware } from '../middleware/auth.middleware.js'
-import { 
+import {
     UserUpdateSchema,
     UserRoleUpdateSchema,
- } from '../schemas/user.schemas.js';
+} from '../schemas/user.schemas.js';
 import { UserController } from '../controllers/user.controller.js';
-import { setGlobalOptions } from 'express-zod-safe';
-
-setGlobalOptions({
-    missingSchemaBehavior: 'any'
-});
 
 const userRouter = Router();
 

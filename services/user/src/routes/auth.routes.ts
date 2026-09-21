@@ -1,24 +1,20 @@
 import { Router } from 'express'
 import validate from 'express-zod-safe'
-import { setGlobalOptions } from 'express-zod-safe';
 
-import { 
-    ChangePasswordRequestSchema, 
-    LoginRequestSchema, 
-    RegisterRequestSchema 
-} from '../schemas/auth.schemas';
-import { AuthController } from '../controllers/auth.controller';
-import { authMiddleware } from '../middleware/auth.middleware';
-
-setGlobalOptions({
-    missingSchemaBehavior: 'any'
-});
+import '../validation.js'
+import {
+    ChangePasswordRequestSchema,
+    LoginRequestSchema,
+    RegisterRequestSchema
+} from '../schemas/auth.schemas.js';
+import { AuthController } from '../controllers/auth.controller.js';
+import { authMiddleware } from '../middleware/auth.middleware.js';
 
 const authRouter = Router()
 
 authRouter.post('/auth/register',
-    validate({ 
-        body: RegisterRequestSchema 
+    validate({
+        body: RegisterRequestSchema
     }),
     AuthController.register
 );

@@ -1,12 +1,10 @@
 import { Router } from 'express';
+import validate from 'express-zod-safe';
+
+import '../validation.js'
 import { authMiddleware } from '../middleware/auth.middleware.js';
 import { CommentController } from '../controllers/comment.controller.js';
-import validate, { setGlobalOptions } from 'express-zod-safe';
 import { CommentCreateSchema, CommentUpdateSchema } from '../schemas/comment.schemas.js';
-
-setGlobalOptions({
-    missingSchemaBehavior: 'any'
-});
 
 const commentRouter = Router();
 

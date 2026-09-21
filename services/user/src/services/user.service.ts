@@ -1,5 +1,6 @@
 import type { Role } from '../generated/prisma/client';
 import { prisma } from '../config/database.js';
+import { NotFoundError } from '../errors.js';
 import type { UserRoleUpdateType, UserUpdateType } from '../schemas/user.schemas.js';
 import { publishUserDeleted } from './eventBus.js';
 
@@ -7,14 +8,17 @@ import { publishUserDeleted } from './eventBus.js';
 export class UserService {
     static async getUsers(page: number, limit: number) {
         const skip = (page - 1) * limit;
-        const users = await prisma.user.findMany({
-            skip: skip,
-            take: limit,
-            orderBy: {
-                createdAt: 'desc'
-            }
-        });
-        return users;
+        const [items, total] = await Promise.all([
+            prisma.user.findMany({
+                skip: skip,
+                take: limit,
+                orderBy: {
+                    createdAt: 'desc'
+                }
+            }),
+            prisma.user.count(),
+        ]);
+        return { items, total, page, limit };
     };
 
     static async getUser(userId: number) {
@@ -22,7 +26,7 @@ export class UserService {
             where: { id: userId },
         });
         if (!user) {
-            throw new Error('Пользователь не найден');
+            throw new NotFoundError('Пользователь не найден');
         };
         return user;
     };
@@ -43,7 +47,7 @@ export class UserService {
             where: { id: userId }
         });
         if (!user) {
-            throw new Error('Пользователь не найден');
+            throw new NotFoundError('Пользователь не найден');
         }
         await prisma.user.delete({
             where: { id: userId }
