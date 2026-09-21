@@ -209,9 +209,11 @@ export class RecipeController {
 
     static async getRecipe(req: AuthRequest, res: Response) {
         try {
+            const currentUserId = req.currentUserId!;
             const { recipeId:recipeIdStr } = req.params;
             const recipeId = parseInt(recipeIdStr as string);
-            const recipe = await RecipeService.getRecipe(recipeId);
+            const isAuthor = await RecipeService.isUserRecipeAuthor(currentUserId, recipeId);
+            const recipe = await RecipeService.getRecipe(recipeId, { includeUnpublished: isAuthor });
             res.status(200).json(RecipeReadSchema.parse(recipe));
         } catch (error: any) {
             res.status(400).json({

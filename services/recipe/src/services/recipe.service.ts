@@ -184,9 +184,13 @@ export class RecipeService {
             }
         });
         
-        // Получаем данные автора
-        const author = await getUser(userId);
-        
+        // Получаем данные авторов сохранённых рецептов
+        const authorIds = [...new Set(savedRecipes.map(sr => sr.recipe.authorId))];
+        const authors = await Promise.all(
+            authorIds.map(id => getUser(id).catch(() => null))
+        );
+        const authorMap = new Map(authors.filter(a => a).map(a => [a!.id, a]));
+
         const transformedRecipes = savedRecipes.map(savedRecipe => ({
             id: savedRecipe.recipe.id,
             title: savedRecipe.recipe.title,
@@ -211,9 +215,9 @@ export class RecipeService {
             createdAt: savedRecipe.recipe.createdAt,
             updatedAt: savedRecipe.recipe.updatedAt,
             isPublished: savedRecipe.recipe.isPublished,
-            author
+            author: authorMap.get(savedRecipe.recipe.authorId)
         }));
-        
+
         return transformedRecipes;
     }
 
@@ -363,14 +367,13 @@ export class RecipeService {
                 }
             });
         });
-        return await RecipeService.getRecipe(recipe.id);
+        return await RecipeService.getRecipe(recipe.id, { includeUnpublished: true });
     };
 
-    static async getRecipe(recipeId: number) {
+    static async getRecipe(recipeId: number, options: { includeUnpublished?: boolean } = {}) {
         const recipe = await prisma.recipe.findUnique({
             where: {
-                id: recipeId,
-                isPublished: true
+                id: recipeId
             },
             include: {
                 recipeDishTypes: {
@@ -387,7 +390,7 @@ export class RecipeService {
             }
         });
 
-        if (!recipe) {
+        if (!recipe || (!recipe.isPublished && !options.includeUnpublished)) {
             throw new Error('Recipe not found');
         }
 
