@@ -1,5 +1,7 @@
-import { createApp } from './app';
-import { config } from './config';
+import 'dotenv/config';
+
+import { createApp } from './app.js';
+import { config } from './config/index.js';
 import { connectRabbitMQ } from './services/eventBus.js';
 
 const app = createApp();

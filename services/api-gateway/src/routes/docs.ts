@@ -26,7 +26,7 @@ const spec = loadSpec();
 
 if (spec) {
     docsRouter.use('/api-docs', swaggerUi.serve, swaggerUi.setup(spec));
-    docsRouter.get('/api-docs/openapi.json', (_req, res) => {
+    docsRouter.get('/openapi.json', (_req, res) => {
         res.status(200).json(spec);
     });
 } else {
