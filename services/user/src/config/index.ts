@@ -19,4 +19,10 @@ export const config = {
     },
     xUserId: process.env.X_USER_ID as string,
     xUserRole: process.env.X_USER_ROLE as string,
+    // Опциональный bootstrap-админ: если обе переменные заданы, user-service
+    // идемпотентно создаёт (или повышает) такого пользователя при старте.
+    admin: {
+        username: process.env.ADMIN_USERNAME,
+        password: process.env.ADMIN_PASSWORD,
+    },
 }

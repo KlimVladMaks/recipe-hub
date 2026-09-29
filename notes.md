@@ -59,3 +59,24 @@ http://localhost:5555
 # prisma-studio-recipe
 http://localhost:5556
 ```
+
+# Тесты
+
+E2E-тесты лежат в каталоге `tests/` и ходят только через API-шлюз (HTTP).
+
+```
+# стек уже поднят
+cd tests
+npm install
+npm test
+
+# одной командой: поднять стек и прогнать тесты
+cd tests
+npm install
+npm run test:stack
+
+# проверка типов тестов
+npm run typecheck
+```
+
+Адрес API можно переопределить: `TEST_BASE_URL=http://localhost:3000/api npm test`.

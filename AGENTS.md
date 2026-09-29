@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Recipe-sharing microservices monorepo. No root package.json — each service is independent.
+Recipe-sharing microservices monorepo. No root package.json — each service and `tests/` is independent.
 Human-facing overview: `README.md`. API contract: `docs/openapi.yaml`.
 
 ## Примерное ТЗ для данного сервиса
@@ -35,10 +35,27 @@ Run from repo root unless noted.
 - Logs: `docker compose logs -f <service>`
 - Prisma Studio: `docker compose --profile prisma-studio up -d --build` (user 5555, recipe 5556)
 - Manual run inside a service dir: `npm start` (executes `tsx src/server.ts`, no build step)
-- Typecheck (only verification available; there are no test/lint scripts): `npm run typecheck`
-  (= `npx tsc --noEmit`) in a service dir — requires `npx prisma generate` first.
+- Typecheck a service (requires `npx prisma generate` first): `npm run typecheck`
+  (= `npx tsc --noEmit`) in a service dir.
+- E2E tests (see "Tests" below): `cd tests && npm install && npm test`, or one-shot `npm run test:stack`.
 - Prisma: `npm run prisma:generate`, `npm run prisma:migrate` (`migrate deploy`).
 - Swagger UI: <http://localhost:3000/api-docs>; raw spec at `/openapi.json`.
+
+## Tests
+
+E2E tests live in `tests/` (independent npm project, `type: module`). They are **black-box**: every request goes through the API gateway (`http://localhost:3000/api`) over HTTP; service code is never imported and the DB is never touched directly. Contracts come from `docs/openapi.yaml`.
+
+- Stack: Node's built-in `node:test` + `node:assert/strict`, run through `tsx`. No Jest/Vitest.
+- Run (stack already up): `cd tests && npm install && npm test`.
+- One-shot (builds stack, waits for health, then tests): `cd tests && npm run test:stack`.
+- Typecheck test code: `cd tests && npm run typecheck`.
+- Override the API base URL with `TEST_BASE_URL`.
+- Layout: `tests/e2e/*.test.ts` (suites), `tests/e2e/helpers/` (`api.ts` fetch wrapper + `waitForStack` + `expectStatus`; `factory.ts` `TestContext`; `unique.ts` unique names), `tests/scripts/` (stack check/up).
+- Coverage: health, auth (register/login/profile/password), users (read, public recipes, saved, subscribers), recipes (CRUD, search/filters, drafts, ownership), steps, comments (+likes), ratings, saved recipes, subscriptions, feed, admin directory CRUD, and validation errors (400) / invalid tokens (401).
+- **No leftover data**: each suite creates a `TestContext`, registers every entity in it, and calls `ctx.cleanup()` in `after()`. Cleanup deletes recipes (cascading steps/comments/likes/ratings/saves), then directory entries (dish types / ingredients, via admin token), then users via `DELETE /users/me`. Tests also assert deletes actually worked (recipe → 404, user login → 401).
+- Use `uniqueName`/`uniqueTitle` for all created data so parallel suites and repeated runs never collide with existing DB rows.
+- **Admin tests**: user-service bootstraps an admin on startup from `ADMIN_USERNAME` / `ADMIN_PASSWORD` (see `services/user/src/services/adminBootstrap.ts`). Tests log in with `loginAsAdmin()` (overrides: `TEST_ADMIN_USERNAME` / `TEST_ADMIN_PASSWORD`) — this is what makes `GET /users`, role changes and directory CRUD (`POST/PATCH/DELETE /dish-types`, `/ingredients`) testable and callable by agents/curl. The bootstrap admin is intentional seed data and is **not** deleted by cleanup.
+- When adding coverage, add a `*.test.ts` file under `tests/e2e/` — it is picked up automatically by the `e2e/**/*.test.ts` glob. Keep to the HTTP-only + cleanup rules above.
 
 ## Critical gotchas
 
@@ -48,6 +65,7 @@ Run from repo root unless noted.
 - Every service entrypoint starts with `import 'dotenv/config'` (before `config` is imported) so local `npm start` works outside Docker.
 - Do **not** add `express.json()` to `api-gateway`. It proxies raw bodies; the other services do parse JSON.
 - Auth flow: only the gateway verifies JWTs and injects `x-user-id` / `x-user-role` headers. `user`/`recipe` trust those headers and contain no JWT code. `/api/internal/*` endpoints are unauthenticated service-to-service routes and are not proxied by the gateway.
+- Roles: registration always creates `role: 'user'` and only an admin can change roles (`PATCH /users/:id/role`), so a chicken-and-egg exists. user-service breaks it at startup by idempotently creating/promoting an admin from `ADMIN_USERNAME`/`ADMIN_PASSWORD` (`services/user/src/services/adminBootstrap.ts`, best-effort, optional). Directory admin checks in `recipe` read `x-user-role`; `user` re-checks the DB via `AuthService.isUserAdmin`.
 - `api-gateway` serves `docs/openapi.yaml` mounted read-only at `/app/openapi.yaml` (compose volume). Locally it also falls back to `../../docs/openapi.yaml`.
 
 ## Conventions

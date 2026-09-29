@@ -1,0 +1,18 @@
+{
+  "name": "recipe-hub-tests",
+  "author": "Владислав Клименков",
+  "private": true,
+  "type": "module",
+  "description": "E2E-тесты RecipeHub: чёрный ящик поверх API-шлюза (http://localhost:3000/api)",
+  "scripts": {
+    "test": "tsx scripts/check-stack.ts && tsx --test \"e2e/**/*.test.ts\"",
+    "test:stack": "tsx scripts/stack-up.ts && npm test",
+    "test:watch": "tsx --test --watch \"e2e/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}
