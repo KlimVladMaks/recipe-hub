@@ -1,3 +1,10 @@
 .vscode/
 node_modules/
 /src/generated/prisma
+
+# Секреты окружения. В git храним только шаблоны .env.example.
+# Локально и на VPS реальные .env генерируются из .env.example.
+.env
+.env.*
+!.env.example
+deploy/.env

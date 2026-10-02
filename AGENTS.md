@@ -89,3 +89,7 @@ E2E tests live in `tests/` (independent npm project, `type: module`). They are *
 - `docs/openapi.yaml` — OpenAPI 3.0 spec for public and `internal` endpoints.
 - `docs/postman/RecipeHub.postman_collection.json` — main end-to-end scenario.
 - Root and per-service `notes.md` hold Docker/Prisma usage in Russian.
+- `deploy/` — Infrastructure as Code: nginx config, `setup-server.sh` / `deploy.sh`
+  and `docker-compose.prod.yml` for VPS deployment. See `deploy/README.md`.
+  Secrets: `services/*/.env` are gitignored; `.env.example` is the committed
+  template and `setup-server.sh` copies it to `.env` on the server.

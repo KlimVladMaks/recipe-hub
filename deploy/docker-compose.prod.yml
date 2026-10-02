@@ -1,0 +1,92 @@
+# Прод-оверрайд для docker-compose.yml (используется вместе с базовым файлом):
+#
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build
+#
+# Отличия от базового compose (который остаётся для локальной разработки):
+#   * все публикуемые порты привязаны к 127.0.0.1 — наружу смотрит только nginx;
+#   * включена ротация логов, чтобы не забить диск VPS;
+#   * политика перезапуска unless-stopped для автоподъёма после reboot.
+#
+# Тег !override обязателен: без него Docker Compose объединил бы списки ports
+# с базовым файлом и оставил бы публикацию на 0.0.0.0.
+
+services:
+  rabbitmq:
+    # Порты брокера нужны только внутри docker-сети и для SSH-туннеля к UI.
+    ports: !override
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  user-db:
+    # Порт БД наружу не нужен; 127.0.0.1 оставлен для отладки через SSH-туннель.
+    ports: !override
+      - "127.0.0.1:5433:5432"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  recipe-db:
+    ports: !override
+      - "127.0.0.1:5434:5432"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  user-service:
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  recipe-service:
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api-gateway:
+    # Наружу не публикуем: доступ идёт через nginx на 80/443.
+    # 127.0.0.1:3000 нужен для локальной проверки health на самом сервере.
+    ports: !override
+      - "127.0.0.1:3000:3000"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  prisma-studio-user:
+    # Prisma Studio — только для отладки через SSH-туннель, наружу не торчит.
+    ports: !override
+      - "127.0.0.1:5555:5555"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  prisma-studio-recipe:
+    ports: !override
+      - "127.0.0.1:5556:5556"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

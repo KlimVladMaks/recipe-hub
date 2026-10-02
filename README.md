@@ -59,6 +59,24 @@ docker compose up -d --build
 - Swagger UI: <http://localhost:3000/api-docs>
 - RabbitMQ UI: <http://localhost:15672> (guest / guest)
 
+## Развёртывание на VPS (ЛР4)
+
+Всё, что нужно для развёртывания на удалённом сервере, лежит в каталоге `deploy/`
+(принцип Infrastructure as Code). На чистом сервере Ubuntu достаточно трёх команд:
+
+```bash
+ssh root@<IP_СЕРВЕРА>
+apt update && apt install -y git
+git clone https://github.com/KlimVladMaks/recipe-hub.git /opt/recipe-hub
+bash /opt/recipe-hub/deploy/scripts/setup-server.sh
+```
+
+Скрипт установит Docker, создаст swap, настроит UFW и nginx (обратный прокси),
+сгенерирует `services/*/.env` из `.env.example` и поднимет стек. Обновление — одной
+командой: `bash /opt/recipe-hub/deploy/scripts/deploy.sh`.
+
+Подробности, схема, секреты, TLS и туннели — в [`deploy/README.md`](deploy/README.md).
+
 ## Запуск сервиса локально
 
 ```bash
@@ -122,6 +140,7 @@ docs/
   openapi.yaml     # OpenAPI-спецификация публичного и внутреннего API
   postman/         # коллекция Postman с основным сценарием
 tests/             # E2E-тесты (node:test + tsx), запуск: npm test
+deploy/            # Infrastructure as Code: nginx, скрипты, prod-compose
 docker-compose.yml
 AGENTS.md          # заметки для ИИ-агентов и разработчиков
 ```
