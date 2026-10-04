@@ -114,8 +114,69 @@ bash /opt/recipe-hub/deploy/scripts/deploy.sh
 ```
 
 Скрипт сделает `git pull`, пересоберёт образы, перезапустит стек, удалит
-неиспользуемые образы и проверит health. Этот же скрипт будет вызываться из
-GitHub Actions на ДЗ6.
+неиспользуемые образы и проверит health. Этот же скрипт вызывается из
+GitHub Actions — см. раздел «Автодеплой (GitHub Actions)».
+
+## Автодеплой (GitHub Actions)
+
+Обновление на VPS выполняется автоматически при пуше в ветку `main` через
+GitHub Actions. Workflow — `.github/workflows/deploy.yml`.
+
+```text
+git push origin main
+        │
+        ▼
+GitHub Actions runner (ubuntu-latest)
+        │  ssh (ключ из repository secrets)
+        ▼
+VPS 139.100.225.216
+        │  bash /opt/recipe-hub/deploy/scripts/deploy.sh
+        ▼
+git pull → docker compose up -d --build → health-check
+```
+
+Логика workflow:
+
+- триггер — `push` только в `main` (работа в других ветках сборку на сервере не
+  запускает), плюс ручной запуск (`workflow_dispatch`);
+- `concurrency: deploy-production` без отмены — два пуша подряд не запускают
+  параллельные сборки на слабом сервере;
+- runner подключается к VPS по SSH отдельным ключом и вызывает тот же
+  `deploy/scripts/deploy.sh`, что и при ручном обновлении;
+- в конце — smoke-test: `curl http://<IP>/api/api-gateway-health` уже снаружи,
+  через nginx.
+
+### Секреты репозитория
+
+Ключ и адрес хранятся в **Settings → Secrets and variables → Actions →
+Repository secrets** (в git не попадают):
+
+| Secret | Назначение |
+| --- | --- |
+| `SSH_HOST` | IP/домен VPS |
+| `SSH_USER` | пользователь для деплоя (`root`) |
+| `SSH_PRIVATE_KEY` | приватный CI-ключ (ed25519) |
+
+Для CI используется **отдельный** SSH-ключ (не личный): его публичная часть
+добавлена в `~/.ssh/authorized_keys` на сервере, приватная — в
+`SSH_PRIVATE_KEY`. При необходимости ключ можно отозвать, удалив строку из
+`authorized_keys`, не затрагивая личный доступ.
+
+### Ручной запуск и логи
+
+```bash
+# список прогонов
+gh run list
+
+# ручной перезапуск деплоя
+gh workflow run deploy.yml
+
+# следить за последним прогоном
+gh run watch
+```
+
+Также прогоны и логи видны на GitHub: вкладка **Actions**. Повторный прогон
+идемпотентен — `deploy.sh` безопасно вызывать несколько раз.
 
 ## Секреты и переменные окружения
 
