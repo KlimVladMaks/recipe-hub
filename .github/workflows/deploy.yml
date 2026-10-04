@@ -1,0 +1,46 @@
+name: Deploy to VPS
+
+# Автодеплой на удалённый VPS (ДЗ6).
+#
+# Запускается только при пуше в main (работа в других ветках сборку на сервере
+# не триггерит) и вручную через кнопку "Run workflow" / `gh workflow run`.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Не допускаем двух одновременных деплоев: на VPS всего 2 vCPU / 2 ГБ RAM, и
+# параллельные сборки образов конкурируют за ресурсы. Очередной пуш в main
+# встанет в очередь, а не отменит уже идущий деплой.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Pull, rebuild and restart on VPS
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Prepare SSH key and known_hosts
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Run deploy script on server
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            'bash /opt/recipe-hub/deploy/scripts/deploy.sh'
+
+      - name: Smoke test through nginx
+        run: |
+          set -euo pipefail
+          curl -fsS "http://${{ secrets.SSH_HOST }}/api/api-gateway-health"
