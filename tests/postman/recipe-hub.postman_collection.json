@@ -1,0 +1,2329 @@
+{
+  "info": {
+    "name": "recipe-hub-deployed",
+    "description": "Проверка развёрнутого на VPS сервиса RecipeHub (ЛР4).\nСценарий самодостаточен: health всех микросервисов, admin/directory, сквозной пользовательский поток (регистрация → рецепты → шаги → поиск/фильтры → рейтинг → комментарии/лайки → избранное → подписка → лента) и полная очистка с проверкой удаления, чтобы БД оставалась чистой.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Health (все микросервисы)",
+      "item": [
+        {
+          "name": "Проверка api-gateway",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api-gateway-health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api-gateway-health"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\nconst body = pm.response.json();\n\npm.test(\"Ответ — объект со status OK и timestamp/uptime\", function () {\n    pm.expect(body).to.be.an(\"object\");\n    pm.expect(body.status).to.be.a(\"string\").and.to.include(\"OK\");\n    pm.expect(body.timestamp).to.be.a(\"string\").and.not.empty;\n    pm.expect(body.uptime).to.be.a(\"number\");\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Проверка user-service",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/user-service-health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user-service-health"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\nconst body = pm.response.json();\n\npm.test(\"Ответ — объект со status OK и timestamp/uptime\", function () {\n    pm.expect(body).to.be.an(\"object\");\n    pm.expect(body.status).to.be.a(\"string\").and.to.include(\"OK\");\n    pm.expect(body.timestamp).to.be.a(\"string\").and.not.empty;\n    pm.expect(body.uptime).to.be.a(\"number\");\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Проверка recipe-service",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipe-service-health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipe-service-health"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\nconst body = pm.response.json();\n\npm.test(\"Ответ — объект со status OK и timestamp/uptime\", function () {\n    pm.expect(body).to.be.an(\"object\");\n    pm.expect(body.status).to.be.a(\"string\").and.to.include(\"OK\");\n    pm.expect(body.timestamp).to.be.a(\"string\").and.not.empty;\n    pm.expect(body.uptime).to.be.a(\"number\");\n});"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Справочники (bootstrap-админ)",
+      "item": [
+        {
+          "name": "Вход bootstrap-админа",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{adminUsername}}\",\n    \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\nconst body = pm.response.json();\n\npm.test(\"Ответ содержит user и jwtToken\", function () {\n    pm.expect(body).to.have.property(\"user\");\n    pm.expect(body).to.have.property(\"jwtToken\");\n});\n\npm.test(\"Пользователь — админ\", function () {\n    pm.expect(body.user.role).to.eql(\"admin\");\n});\n\npm.collectionVariables.set(\"adminJWT\", body.jwtToken);\npm.collectionVariables.set(\"adminId\", body.user.id);\npm.test(\"В ответе нет пароля\", function () {\n    pm.expect(body.user).to.not.have.property(\"passwordHash\");\n    pm.expect(body.user).to.not.have.property(\"password\");\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Создание типа блюда (админ)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dish-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dish-types"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminJWT}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"{{dishTitle}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const stamp = Date.now().toString(36) + \"_\" + Math.random().toString(36).slice(2, 8);",
+                  "pm.collectionVariables.set(\"dishTitle\", \"Тип_\" + stamp);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 201\", function () {\n    pm.response.to.have.status(201);\n});\nconst body = pm.response.json();\n\npm.test(\"Созданный тип содержит id и title\", function () {\n    pm.expect(body.id).to.be.a(\"number\");\n    pm.expect(body.title).to.eql(pm.collectionVariables.get(\"dishTitle\"));\n});\n\npm.collectionVariables.set(\"dishTypeId\", body.id);"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Создание ингредиента (админ)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ingredients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ingredients"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminJWT}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"{{ingredientTitle}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const stamp = Date.now().toString(36) + \"_\" + Math.random().toString(36).slice(2, 8);",
+                  "pm.collectionVariables.set(\"ingredientTitle\", \"Ингредиент_\" + stamp);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 201\", function () {\n    pm.response.to.have.status(201);\n});\nconst body = pm.response.json();\n\npm.test(\"Созданный ингредиент содержит id и title\", function () {\n    pm.expect(body.id).to.be.a(\"number\");\n    pm.expect(body.title).to.eql(pm.collectionVariables.get(\"ingredientTitle\"));\n});\n\npm.collectionVariables.set(\"ingredientId\", body.id);"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Поиск типа блюда по названию",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dish-types?search={{dishTitle}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dish-types"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "{{dishTitle}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\npm.test(\"Ответ — конверт пагинации с items\", function () {\n    const body = pm.response.json();\n    pm.expect(body).to.be.an(\"object\");\n    pm.expect(body.items).to.be.an(\"array\");\n    pm.expect(body).to.have.property(\"total\");\n    pm.expect(body).to.have.property(\"page\");\n    pm.expect(body).to.have.property(\"limit\");\n});\nconst found = pm.response.json().items.some(function (d) {\n    return d.id === pm.collectionVariables.get(\"dishTypeId\");\n});\npm.test(\"Список содержит созданный тип блюда\", function () {\n    pm.expect(found).to.be.true;\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Поиск ингредиента по названию",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ingredients?search={{ingredientTitle}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ingredients"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "{{ingredientTitle}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\npm.test(\"Ответ — конверт пагинации с items\", function () {\n    const body = pm.response.json();\n    pm.expect(body).to.be.an(\"object\");\n    pm.expect(body.items).to.be.an(\"array\");\n    pm.expect(body).to.have.property(\"total\");\n    pm.expect(body).to.have.property(\"page\");\n    pm.expect(body).to.have.property(\"limit\");\n});\nconst found = pm.response.json().items.some(function (i) {\n    return i.id === pm.collectionVariables.get(\"ingredientId\");\n});\npm.test(\"Список содержит созданный ингредиент\", function () {\n    pm.expect(found).to.be.true;\n});"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Основной сценарий",
+      "item": [
+        {
+          "name": "Регистрация автора",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{authorUsername}}\",\n    \"password\": \"{{authorPassword}}\",\n    \"firstName\": \"name1\",\n    \"lastName\": \"name2\",\n    \"about\": \"about1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const stamp = Date.now().toString(36) + \"_\" + Math.random().toString(36).slice(2, 8);",
+                  "pm.collectionVariables.set(\"authorUsername\", \"author_\" + stamp);",
+                  "pm.collectionVariables.set(\"authorPassword\", \"password123\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 201\", function () {\n    pm.response.to.have.status(201);\n});\nconst body = pm.response.json();\n\npm.test(\"Ответ содержит все требуемые поля\", function () {\n    pm.expect(body).to.have.property(\"id\");\n    pm.expect(body).to.have.property(\"username\");\n    pm.expect(body).to.have.property(\"firstName\");\n    pm.expect(body).to.have.property(\"lastName\");\n    pm.expect(body).to.have.property(\"role\");\n    pm.expect(body.role).to.eql(\"user\");\n});\n\npm.test(\"Username совпадает с ожидаемым\", function () {\n    pm.expect(body.username).to.eql(pm.collectionVariables.get(\"authorUsername\"));\n});\n\npm.test(\"Пароль не возвращается\", function () {\n    pm.expect(body).to.not.have.property(\"passwordHash\");\n});\n\npm.collectionVariables.set(\"authorId\", body.id);"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Вход автора",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{authorUsername}}\",\n    \"password\": \"{{authorPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\nconst body = pm.response.json();\n\npm.test(\"Ответ содержит JWT-токен и пользователя\", function () {\n    pm.expect(body).to.have.property(\"jwtToken\");\n    pm.expect(body).to.have.property(\"user\");\n});\n\npm.collectionVariables.set(\"authorJWT\", body.jwtToken);"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Создание 1-го рецепта (сложность hard, справочники, 2 фото)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recipes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authorJWT}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"{{recipe1Title}}\",\n    \"description\": \"Описание рецепта 1\",\n    \"dishTypeIds\": [{{dishTypeId}}],\n    \"ingredientIds\": [{{ingredientId}}],\n    \"media\": [\n        { \"sortOrder\": 1, \"mediaType\": \"photo\", \"mediaUrl\": \"url1\" },\n        { \"sortOrder\": 2, \"mediaType\": \"photo\", \"mediaUrl\": \"url2\" }\n    ],\n    \"difficulty\": \"hard\",\n    \"isPublished\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const stamp = Date.now().toString(36) + \"_\" + Math.random().toString(36).slice(2, 8);",
+                  "pm.collectionVariables.set(\"recipePrefix\", stamp);",
+                  "pm.collectionVariables.set(\"recipe1Title\", \"Рецепт 1 \" + stamp);",
+                  "pm.collectionVariables.set(\"recipe2Title\", \"Рецепт 2 \" + stamp);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 201\", function () {\n    pm.response.to.have.status(201);\n});\nconst body = pm.response.json();\n\npm.test(\"Рецепт содержит обязательные поля\", function () {\n    pm.expect(body).to.have.property(\"id\");\n    pm.expect(body.title).to.eql(pm.collectionVariables.get(\"recipe1Title\"));\n    pm.expect(body.difficulty).to.eql(\"hard\");\n    pm.expect(body.isPublished).to.eql(true);\n    pm.expect(body.media).to.have.lengthOf(2);\n    pm.expect(body.author.id).to.eql(pm.collectionVariables.get(\"authorId\"));\n});\n\npm.test(\"Справочники подставлены в рецепт\", function () {\n    pm.expect(body.dishTypes.some(function (d) { return d.id === pm.collectionVariables.get(\"dishTypeId\"); })).to.be.true;\n    pm.expect(body.ingredients.some(function (i) { return i.id === pm.collectionVariables.get(\"ingredientId\"); })).to.be.true;\n});\n\npm.collectionVariables.set(\"recipe1Id\", body.id);"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Создание 2-го рецепта (сложность easy)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recipes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authorJWT}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"{{recipe2Title}}\",\n    \"description\": \"Описание рецепта 2\",\n    \"media\": [\n        {\n            \"sortOrder\": 1,\n            \"mediaType\": \"photo\",\n            \"mediaUrl\": \"url3\"\n        }\n    ],\n    \"difficulty\": \"easy\",\n    \"isPublished\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 201\", function () {\n    pm.response.to.have.status(201);\n});\nconst body = pm.response.json();\n\npm.test(\"2-й рецепт создан с difficulty=easy\", function () {\n    pm.expect(body.title).to.eql(pm.collectionVariables.get(\"recipe2Title\"));\n    pm.expect(body.difficulty).to.eql(\"easy\");\n    pm.expect(body.author.id).to.eql(pm.collectionVariables.get(\"authorId\"));\n});\n\npm.collectionVariables.set(\"recipe2Id\", body.id);"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Добавление 1-го шага ко 2-му рецепту",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe2Id}}/steps",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe2Id}}",
+                "steps"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authorJWT}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"number\": 1,\n    \"title\": \"Шаг 1\",\n    \"media\": [\n        {\n            \"sortOrder\": 1,\n            \"mediaType\": \"photo\",\n            \"mediaUrl\": \"url5\"\n        }\n    ],\n    \"description\": \"Описание шага 1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 201\", function () {\n    pm.response.to.have.status(201);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Добавление 2-го шага ко 2-му рецепту",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe2Id}}/steps",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe2Id}}",
+                "steps"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authorJWT}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"number\": 2,\n    \"title\": \"Шаг 2\",\n    \"media\": [\n        {\n            \"sortOrder\": 1,\n            \"mediaType\": \"photo\",\n            \"mediaUrl\": \"url6\"\n        }\n    ],\n    \"description\": \"Описание шага 2\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 201\", function () {\n    pm.response.to.have.status(201);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Просмотр шагов 2-го рецепта (должно быть 2)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe2Id}}/steps",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe2Id}}",
+                "steps"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authorJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\nconst body = pm.response.json();\n\npm.test(\"Ответ — массив из двух шагов\", function () {\n    pm.expect(body).to.be.an(\"array\");\n    pm.expect(body).to.have.lengthOf(2);\n    pm.expect(body[0]).to.have.property(\"number\");\n    pm.expect(body[0]).to.have.property(\"media\");\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Просмотр рецептов автора (должно быть 2)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/recipes?search={{recipePrefix}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "recipes"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "{{recipePrefix}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authorJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\npm.test(\"Ответ — конверт пагинации с items\", function () {\n    const body = pm.response.json();\n    pm.expect(body).to.be.an(\"object\");\n    pm.expect(body.items).to.be.an(\"array\");\n    pm.expect(body).to.have.property(\"total\");\n    pm.expect(body).to.have.property(\"page\");\n    pm.expect(body).to.have.property(\"limit\");\n});\nconst ids = pm.response.json().items.map(function (r) { return r.id; });\npm.test(\"Содержит оба рецепта автора\", function () {\n    pm.expect(ids).to.include(pm.collectionVariables.get(\"recipe1Id\"));\n    pm.expect(ids).to.include(pm.collectionVariables.get(\"recipe2Id\"));\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Регистрация подписчика",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{userUsername}}\",\n    \"password\": \"{{userPassword}}\",\n    \"firstName\": \"name1\",\n    \"lastName\": \"name2\",\n    \"about\": \"about1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const stamp = Date.now().toString(36) + \"_\" + Math.random().toString(36).slice(2, 8);",
+                  "pm.collectionVariables.set(\"userUsername\", \"reader_\" + stamp);",
+                  "pm.collectionVariables.set(\"userPassword\", \"password123\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 201\", function () {\n    pm.response.to.have.status(201);\n});\nconst body = pm.response.json();\n\npm.test(\"Username совпадает с ожидаемым\", function () {\n    pm.expect(body.username).to.eql(pm.collectionVariables.get(\"userUsername\"));\n});\n\npm.collectionVariables.set(\"userId\", body.id);"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Вход подписчика",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{userUsername}}\",\n    \"password\": \"{{userPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\nconst body = pm.response.json();\n\npm.test(\"Ответ содержит JWT-токен\", function () {\n    pm.expect(body).to.have.property(\"jwtToken\");\n});\n\npm.collectionVariables.set(\"userJWT\", body.jwtToken);"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Поиск с фильтром difficulty=easy (только 2-й рецепт)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipes?difficulty=easy&search={{recipePrefix}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes"
+              ],
+              "query": [
+                {
+                  "key": "difficulty",
+                  "value": "easy"
+                },
+                {
+                  "key": "search",
+                  "value": "{{recipePrefix}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\npm.test(\"Ответ — конверт пагинации с items\", function () {\n    const body = pm.response.json();\n    pm.expect(body).to.be.an(\"object\");\n    pm.expect(body.items).to.be.an(\"array\");\n    pm.expect(body).to.have.property(\"total\");\n    pm.expect(body).to.have.property(\"page\");\n    pm.expect(body).to.have.property(\"limit\");\n});\nconst ids = pm.response.json().items.map(function (r) { return r.id; });\npm.test(\"Есть 2-й рецепт, нет 1-го\", function () {\n    pm.expect(ids).to.include(pm.collectionVariables.get(\"recipe2Id\"));\n    pm.expect(ids).to.not.include(pm.collectionVariables.get(\"recipe1Id\"));\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Фильтр по типу блюда (1-й рецепт)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipes?dishTypeIds={{dishTypeId}}&search={{recipePrefix}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes"
+              ],
+              "query": [
+                {
+                  "key": "dishTypeIds",
+                  "value": "{{dishTypeId}}"
+                },
+                {
+                  "key": "search",
+                  "value": "{{recipePrefix}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\npm.test(\"Ответ — конверт пагинации с items\", function () {\n    const body = pm.response.json();\n    pm.expect(body).to.be.an(\"object\");\n    pm.expect(body.items).to.be.an(\"array\");\n    pm.expect(body).to.have.property(\"total\");\n    pm.expect(body).to.have.property(\"page\");\n    pm.expect(body).to.have.property(\"limit\");\n});\nconst ids = pm.response.json().items.map(function (r) { return r.id; });\npm.test(\"Найден 1-й рецепт по типу блюда\", function () {\n    pm.expect(ids).to.include(pm.collectionVariables.get(\"recipe1Id\"));\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Фильтр по ингредиенту (1-й рецепт)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipes?ingredientIds={{ingredientId}}&search={{recipePrefix}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes"
+              ],
+              "query": [
+                {
+                  "key": "ingredientIds",
+                  "value": "{{ingredientId}}"
+                },
+                {
+                  "key": "search",
+                  "value": "{{recipePrefix}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\npm.test(\"Ответ — конверт пагинации с items\", function () {\n    const body = pm.response.json();\n    pm.expect(body).to.be.an(\"object\");\n    pm.expect(body.items).to.be.an(\"array\");\n    pm.expect(body).to.have.property(\"total\");\n    pm.expect(body).to.have.property(\"page\");\n    pm.expect(body).to.have.property(\"limit\");\n});\nconst ids = pm.response.json().items.map(function (r) { return r.id; });\npm.test(\"Найден 1-й рецепт по ингредиенту\", function () {\n    pm.expect(ids).to.include(pm.collectionVariables.get(\"recipe1Id\"));\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Обновление 2-го рецепта автором (difficulty=medium)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe2Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe2Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authorJWT}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"difficulty\": \"medium\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\nconst body = pm.response.json();\n\npm.test(\"Сложность обновилась\", function () {\n    pm.expect(body.difficulty).to.eql(\"medium\");\n    pm.expect(body.id).to.eql(pm.collectionVariables.get(\"recipe2Id\"));\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Оценка 2-го рецепта (rating=5)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe2Id}}/rating",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe2Id}}",
+                "rating"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"rating\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\nconst body = pm.response.json();\n\npm.test(\"avgRating=5, userRating=5\", function () {\n    pm.expect(body.avgRating).to.eql(5);\n    pm.expect(body.userRating).to.eql(5);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Проверка оценки 2-го рецепта (avg=5, user=5)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe2Id}}/rating",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe2Id}}",
+                "rating"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\nconst body = pm.response.json();\n\npm.test(\"avgRating=5, userRating=5\", function () {\n    pm.expect(body.avgRating).to.eql(5);\n    pm.expect(body.userRating).to.eql(5);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Добавление комментария ко 2-му рецепту",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe2Id}}/comments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe2Id}}",
+                "comments"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"text\": \"{{commentText}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const stamp = Date.now().toString(36) + \"_\" + Math.random().toString(36).slice(2, 8);",
+                  "pm.collectionVariables.set(\"commentText\", \"Тестовый комментарий \" + stamp);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 201\", function () {\n    pm.response.to.have.status(201);\n});\nconst body = pm.response.json();\n\npm.test(\"Комментарий содержит id, текст и автора-подписчика\", function () {\n    pm.expect(body.id).to.be.a(\"number\");\n    pm.expect(body.text).to.eql(pm.collectionVariables.get(\"commentText\"));\n    pm.expect(body.user.id).to.eql(pm.collectionVariables.get(\"userId\"));\n});\n\npm.collectionVariables.set(\"commentId\", body.id);"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Список комментариев (1, автор — подписчик)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe2Id}}/comments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe2Id}}",
+                "comments"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\npm.test(\"Ответ — конверт пагинации с items\", function () {\n    const body = pm.response.json();\n    pm.expect(body).to.be.an(\"object\");\n    pm.expect(body.items).to.be.an(\"array\");\n    pm.expect(body).to.have.property(\"total\");\n    pm.expect(body).to.have.property(\"page\");\n    pm.expect(body).to.have.property(\"limit\");\n});\nconst body = pm.response.json();\nconst comment = body.items.filter(function (c) { return c.id === pm.collectionVariables.get(\"commentId\"); })[0];\npm.test(\"Найден созданный комментарий с верным автором и текстом\", function () {\n    pm.expect(comment).to.be.an(\"object\");\n    pm.expect(comment.user.id).to.eql(pm.collectionVariables.get(\"userId\"));\n    pm.expect(comment.text).to.eql(pm.collectionVariables.get(\"commentText\"));\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Проверка лайка до постановки (isLiked=false)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe2Id}}/comments/{{commentId}}/like",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe2Id}}",
+                "comments",
+                "{{commentId}}",
+                "like"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\npm.test(\"isLiked=false\", function () {\n    pm.expect(pm.response.json().isLiked).to.eql(false);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Лайк комментария",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe2Id}}/comments/{{commentId}}/like",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe2Id}}",
+                "comments",
+                "{{commentId}}",
+                "like"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Проверка лайка после постановки (isLiked=true)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe2Id}}/comments/{{commentId}}/like",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe2Id}}",
+                "comments",
+                "{{commentId}}",
+                "like"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\npm.test(\"isLiked=true\", function () {\n    pm.expect(pm.response.json().isLiked).to.eql(true);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Снятие лайка",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe2Id}}/comments/{{commentId}}/like",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe2Id}}",
+                "comments",
+                "{{commentId}}",
+                "like"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 204\", function () {\n    pm.response.to.have.status(204);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Проверка лайка после снятия (isLiked=false)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe2Id}}/comments/{{commentId}}/like",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe2Id}}",
+                "comments",
+                "{{commentId}}",
+                "like"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\npm.test(\"isLiked=false\", function () {\n    pm.expect(pm.response.json().isLiked).to.eql(false);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Сохранение 2-го рецепта в избранное",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe2Id}}/save",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe2Id}}",
+                "save"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Проверка статуса сохранения (isSaved=true)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe2Id}}/save",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe2Id}}",
+                "save"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\npm.test(\"isSaved=true\", function () {\n    pm.expect(pm.response.json().isSaved).to.eql(true);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Проверка избранного /users/me/saved-recipes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/saved-recipes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "saved-recipes"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\npm.test(\"Ответ — конверт пагинации с items\", function () {\n    const body = pm.response.json();\n    pm.expect(body).to.be.an(\"object\");\n    pm.expect(body.items).to.be.an(\"array\");\n    pm.expect(body).to.have.property(\"total\");\n    pm.expect(body).to.have.property(\"page\");\n    pm.expect(body).to.have.property(\"limit\");\n});\nconst ids = pm.response.json().items.map(function (r) { return r.id; });\npm.test(\"Содержит 2-й рецепт\", function () {\n    pm.expect(ids).to.include(pm.collectionVariables.get(\"recipe2Id\"));\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Подписка на автора",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{authorId}}/subscribe",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{authorId}}",
+                "subscribe"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Проверка подписки (isSubscribed=true)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{authorId}}/subscribe",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{authorId}}",
+                "subscribe"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\npm.test(\"isSubscribed=true\", function () {\n    pm.expect(pm.response.json().isSubscribed).to.eql(true);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Мои подписки содержат автора",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/subscriptions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "subscriptions"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\npm.test(\"Ответ — конверт пагинации с items\", function () {\n    const body = pm.response.json();\n    pm.expect(body).to.be.an(\"object\");\n    pm.expect(body.items).to.be.an(\"array\");\n    pm.expect(body).to.have.property(\"total\");\n    pm.expect(body).to.have.property(\"page\");\n    pm.expect(body).to.have.property(\"limit\");\n});\nconst ids = pm.response.json().items.map(function (u) { return u.id; });\npm.test(\"Подписки содержат автора\", function () {\n    pm.expect(ids).to.include(pm.collectionVariables.get(\"authorId\"));\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Лента рецептов содержит оба рецепта автора",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/feed",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "feed"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\npm.test(\"Ответ — конверт пагинации с items\", function () {\n    const body = pm.response.json();\n    pm.expect(body).to.be.an(\"object\");\n    pm.expect(body.items).to.be.an(\"array\");\n    pm.expect(body).to.have.property(\"total\");\n    pm.expect(body).to.have.property(\"page\");\n    pm.expect(body).to.have.property(\"limit\");\n});\nconst ids = pm.response.json().items.map(function (r) { return r.id; });\npm.test(\"Содержит оба рецепта автора\", function () {\n    pm.expect(ids).to.include(pm.collectionVariables.get(\"recipe1Id\"));\n    pm.expect(ids).to.include(pm.collectionVariables.get(\"recipe2Id\"));\n});"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Очистка и проверка удаления",
+      "item": [
+        {
+          "name": "Удаление комментария",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe2Id}}/comments/{{commentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe2Id}}",
+                "comments",
+                "{{commentId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 204\", function () {\n    pm.response.to.have.status(204);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Комментарий исчез (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe2Id}}/comments/{{commentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe2Id}}",
+                "comments",
+                "{{commentId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 404\", function () {\n    pm.response.to.have.status(404);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Удаление 1-го рецепта",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe1Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe1Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authorJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 204\", function () {\n    pm.response.to.have.status(204);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "1-й рецепт исчез (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe1Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe1Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authorJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 404\", function () {\n    pm.response.to.have.status(404);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Удаление 2-го рецепта (каскад: шаги/оценки/сохранения)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe2Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe2Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authorJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 204\", function () {\n    pm.response.to.have.status(204);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "2-й рецепт исчез (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recipes/{{recipe2Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recipes",
+                "{{recipe2Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authorJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 404\", function () {\n    pm.response.to.have.status(404);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Удаление типа блюда (админ)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dish-types/{{dishTypeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dish-types",
+                "{{dishTypeId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 204\", function () {\n    pm.response.to.have.status(204);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Тип блюда исчез (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dish-types/{{dishTypeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dish-types",
+                "{{dishTypeId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 404\", function () {\n    pm.response.to.have.status(404);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Удаление ингредиента (админ)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ingredients/{{ingredientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ingredients",
+                "{{ingredientId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 204\", function () {\n    pm.response.to.have.status(204);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ингредиент исчез (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ingredients/{{ingredientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ingredients",
+                "{{ingredientId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 404\", function () {\n    pm.response.to.have.status(404);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Удаление автора (DELETE /users/me)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authorJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 204\", function () {\n    pm.response.to.have.status(204);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Удаление подписчика (DELETE /users/me)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userJWT}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 204\", function () {\n    pm.response.to.have.status(204);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Вход удалённого автора запрещён (401)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{authorUsername}}\",\n    \"password\": \"{{authorPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 401\", function () {\n    pm.response.to.have.status(401);\n});"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Вход удалённого подписчика запрещён (401)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{userUsername}}\",\n    \"password\": \"{{userPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": "pm.test(\"Статус код 401\", function () {\n    pm.response.to.have.status(401);\n});"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://139.100.225.216/api"
+    },
+    {
+      "key": "adminUsername",
+      "value": "admin"
+    },
+    {
+      "key": "adminPassword",
+      "value": "admin123"
+    },
+    {
+      "key": "adminId",
+      "value": ""
+    },
+    {
+      "key": "adminJWT",
+      "value": ""
+    },
+    {
+      "key": "dishTitle",
+      "value": ""
+    },
+    {
+      "key": "dishTypeId",
+      "value": ""
+    },
+    {
+      "key": "ingredientTitle",
+      "value": ""
+    },
+    {
+      "key": "ingredientId",
+      "value": ""
+    },
+    {
+      "key": "authorUsername",
+      "value": ""
+    },
+    {
+      "key": "authorPassword",
+      "value": ""
+    },
+    {
+      "key": "authorId",
+      "value": ""
+    },
+    {
+      "key": "recipePrefix",
+      "value": ""
+    },
+    {
+      "key": "recipe1Title",
+      "value": ""
+    },
+    {
+      "key": "recipe2Title",
+      "value": ""
+    },
+    {
+      "key": "recipe1Id",
+      "value": ""
+    },
+    {
+      "key": "recipe2Id",
+      "value": ""
+    },
+    {
+      "key": "authorJWT",
+      "value": ""
+    },
+    {
+      "key": "userUsername",
+      "value": ""
+    },
+    {
+      "key": "userPassword",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "userJWT",
+      "value": ""
+    },
+    {
+      "key": "commentText",
+      "value": ""
+    },
+    {
+      "key": "commentId",
+      "value": ""
+    }
+  ]
+}

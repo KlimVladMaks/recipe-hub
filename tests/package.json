@@ -8,10 +8,12 @@
     "test": "tsx scripts/check-stack.ts && tsx --test \"e2e/**/*.test.ts\"",
     "test:stack": "tsx scripts/stack-up.ts && npm test",
     "test:watch": "tsx --test --watch \"e2e/**/*.test.ts\"",
+    "test:postman": "newman run postman/recipe-hub.postman_collection.json",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^25.0.0",
+    "newman": "^6.2.2",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2"
   }
