@@ -23,7 +23,9 @@ health_retries: 60
 health_delay: 3
 
 # --- Хост -------------------------------------------------------------
-timezone: Europe/Moscow
+# Сервер (и логи контейнеров/CI) живут в UTC. Если нужен другой пояс,
+# поменяй значение и прогони `ansible-playbook site.yml --tags common`.
+timezone: Etc/UTC
 
 # Swap страхует сборку образов от OOM на VPS с 2 ГБ RAM.
 swap_file: /swapfile
