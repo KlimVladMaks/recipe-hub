@@ -138,9 +138,9 @@ services/
   recipe/          # recipe-service, ESM
 docs/
   openapi.yaml     # OpenAPI-спецификация публичного и внутреннего API
-  postman/         # коллекция Postman с основным сценарием
-tests/             # E2E-тесты (node:test + tsx), запуск: npm test
+tests/             # E2E-тесты (node:test + tsx) и Postman-коллекция
 deploy/            # Infrastructure as Code: nginx, скрипты, prod-compose
+.github/workflows/ # CI: автодеплой на VPS при push в main
 docker-compose.yml
 AGENTS.md          # заметки для ИИ-агентов и разработчиков
 ```
@@ -149,8 +149,9 @@ AGENTS.md          # заметки для ИИ-агентов и разрабо
 
 - `docs/openapi.yaml` — актуальная OpenAPI 3 спецификация (публичные и `internal` маршруты).
 - Swagger UI в шлюзе: `/api-docs`.
-- Postman: `docs/postman/RecipeHub.postman_collection.json` (регистрация → вход → рецепт →
-  шаги → комментарий/лайк → рейтинг → подписка → лента).
+- Postman: `tests/postman/recipe-hub.postman_collection.json` (регистрация → вход → рецепт →
+  шаги → комментарий/лайк → рейтинг → подписка → лента); запуск —
+  `cd tests && npm run test:postman` (newman).
 
 ## Prisma
 
