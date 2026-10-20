@@ -1,0 +1,60 @@
+---
+# Базовая настройка хоста: пакеты, часовой пояс, swap.
+- name: Обновить кэш apt
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Установить базовые пакеты
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - git
+      - lsb-release
+      - ufw
+    state: present
+    install_recommends: false
+
+- name: Установить часовой пояс
+  community.general.timezone:
+    name: "{{ timezone }}"
+
+# --- Swap -------------------------------------------------------------
+# На VPS 2 ГБ RAM сборка docker-образов может упасть по OOM, поэтому swap
+# обязателен. `creates` делает шаг идемпотентным.
+- name: Создать swap-файл
+  ansible.builtin.shell: |
+    set -euo pipefail
+    if ! fallocate -l {{ swap_size_mb }}M {{ swap_file }} 2>/dev/null; then
+        dd if=/dev/zero of={{ swap_file }} bs=1M count={{ swap_size_mb }} status=none
+    fi
+    chmod 600 {{ swap_file }}
+    mkswap {{ swap_file }} >/dev/null
+  args:
+    creates: "{{ swap_file }}"
+    # /bin/sh на Ubuntu — это dash, а ему `set -o pipefail` незнаком.
+    executable: /bin/bash
+  tags: [swap]
+
+- name: Проверить, какие swap-файлы подключены
+  ansible.builtin.command: swapon --show=NAME --noheadings
+  register: common_swap_active
+  changed_when: false
+  check_mode: false
+  tags: [swap]
+
+- name: Подключить swap-файл
+  ansible.builtin.command: swapon {{ swap_file }}
+  when: swap_file not in common_swap_active.stdout
+  changed_when: true
+  tags: [swap]
+
+- name: Прописать swap-файл в /etc/fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^{{ swap_file }}\s'
+    line: "{{ swap_file }} none swap sw 0 0"
+    state: present
+  tags: [swap]

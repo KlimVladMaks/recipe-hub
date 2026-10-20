@@ -59,10 +59,12 @@ docker compose up -d --build
 - Swagger UI: <http://localhost:3000/api-docs>
 - RabbitMQ UI: <http://localhost:15672> (guest / guest)
 
-## Развёртывание на VPS (ЛР4)
+## Развёртывание на VPS (ЛР4 / Ansible)
 
 Всё, что нужно для развёртывания на удалённом сервере, лежит в каталоге `deploy/`
-(принцип Infrastructure as Code). На чистом сервере Ubuntu достаточно трёх команд:
+(принцип Infrastructure as Code). Настройка сервера и деплой описаны декларативно
+средствами **Ansible** (`deploy/ansible/`: playbooks, роли, инвентарь). На чистом
+сервере Ubuntu достаточно трёх команд:
 
 ```bash
 ssh root@<IP_СЕРВЕРА>
@@ -71,11 +73,13 @@ git clone https://github.com/KlimVladMaks/recipe-hub.git /opt/recipe-hub
 bash /opt/recipe-hub/deploy/scripts/setup-server.sh
 ```
 
-Скрипт установит Docker, создаст swap, настроит UFW и nginx (обратный прокси),
-сгенерирует `services/*/.env` из `.env.example` и поднимет стек. Обновление — одной
-командой: `bash /opt/recipe-hub/deploy/scripts/deploy.sh`.
+Скрипт ставит Ansible и запускает `site.yml`: Docker, swap, UFW, nginx (обратный
+прокси), `services/*/.env` из `.env.example` и запуск стека. Обновление — одной
+командой: `bash /opt/recipe-hub/deploy/scripts/deploy.sh` (запускает `deploy.yml`).
+Playbook-и идемпотентны: повторный прогон ничего не меняет.
 
-Подробности, схема, секреты, TLS и туннели — в [`deploy/README.md`](deploy/README.md).
+Подробности, схема, секреты, TLS, туннели и команды Ansible — в
+[`deploy/README.md`](deploy/README.md).
 
 ## Запуск сервиса локально
 
@@ -138,9 +142,9 @@ services/
   recipe/          # recipe-service, ESM
 docs/
   openapi.yaml     # OpenAPI-спецификация публичного и внутреннего API
-  postman/         # коллекция Postman с основным сценарием
-tests/             # E2E-тесты (node:test + tsx), запуск: npm test
+tests/             # E2E-тесты (node:test + tsx) и Postman-коллекция
 deploy/            # Infrastructure as Code: nginx, скрипты, prod-compose
+.github/workflows/ # CI: автодеплой на VPS при push в main
 docker-compose.yml
 AGENTS.md          # заметки для ИИ-агентов и разработчиков
 ```
@@ -149,8 +153,9 @@ AGENTS.md          # заметки для ИИ-агентов и разрабо
 
 - `docs/openapi.yaml` — актуальная OpenAPI 3 спецификация (публичные и `internal` маршруты).
 - Swagger UI в шлюзе: `/api-docs`.
-- Postman: `docs/postman/RecipeHub.postman_collection.json` (регистрация → вход → рецепт →
-  шаги → комментарий/лайк → рейтинг → подписка → лента).
+- Postman: `tests/postman/recipe-hub.postman_collection.json` (регистрация → вход → рецепт →
+  шаги → комментарий/лайк → рейтинг → подписка → лента); запуск —
+  `cd tests && npm run test:postman` (newman).
 
 ## Prisma
 

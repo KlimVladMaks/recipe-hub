@@ -1,0 +1,62 @@
+---
+# Роль app — состояние приложения: код в app_dir, .env, запущенный стек.
+# Используется и в site.yml (первый деплой), и в deploy.yml (обновление).
+- name: Получить код приложения (клонировать или обновить)
+  ansible.builtin.git:
+    repo: "{{ repo_url }}"
+    dest: "{{ app_dir }}"
+    version: "{{ branch }}"
+    update: true
+    accept_hostkey: true
+
+# Секретов в git нет: .env генерируется из .env.example. `force: false`
+# гарантирует, что существующий .env на сервере не будет перезаписан.
+- name: Проверить наличие шаблонов .env.example
+  ansible.builtin.stat:
+    path: "{{ app_dir }}/services/{{ item }}/.env.example"
+  loop: "{{ services }}"
+  loop_control:
+    label: "{{ item }}"
+  register: app_env_examples
+
+- name: Создать services/*/.env из .env.example (если ещё нет)
+  ansible.builtin.copy:
+    src: "{{ app_dir }}/services/{{ item.item }}/.env.example"
+    dest: "{{ app_dir }}/services/{{ item.item }}/.env"
+    remote_src: true
+    force: false
+    mode: "0600"
+  loop: "{{ app_env_examples.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.stat.exists
+
+# `docker compose up --build` — единственное место, где нужен shell-out:
+# модуль community.docker.docker_compose_v2 тянет лишнюю коллекцию и хуже
+# переносит долгую сборку образов на VPS с 2 ГБ RAM.
+# Задача всегда показывает `changed`: пересборка образов — это и есть деплой,
+# даже если код не изменился. Остальные роли идемпотентны, и на повторном
+# прогоне `site.yml` меняется только эта задача.
+- name: Собрать и запустить стек
+  ansible.builtin.command:
+    cmd: docker compose {{ compose_flags }} up -d --build
+    chdir: "{{ app_dir }}"
+  changed_when: true
+
+- name: Дождаться готовности API
+  ansible.builtin.uri:
+    url: "{{ health_url }}"
+    status_code: 200
+  register: app_health
+  until: app_health.status | default(0) == 200
+  retries: "{{ health_retries }}"
+  delay: "{{ health_delay }}"
+  changed_when: false
+
+- name: Показать результат
+  ansible.builtin.debug:
+    msg: >-
+      RecipeHub готов: {{ health_url }}
+      (внешний адрес — http://<IP_СЕРВЕРА>/api/api-gateway-health,
+      логи — cd {{ app_dir }} && docker compose {{ compose_flags }} logs -f)
+  when: not ansible_check_mode

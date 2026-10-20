@@ -1,0 +1,37 @@
+# Общие переменные для всех хостов и playbook-ов.
+#
+# Значения можно переопределить через `-e` (например, из обёрток
+# deploy/scripts/*.sh): приоритет extra vars выше group_vars.
+
+# --- Приложение -------------------------------------------------------
+app_dir: "{{ lookup('env', 'APP_DIR') | default('/opt/recipe-hub', true) }}"
+repo_url: "{{ lookup('env', 'REPO_URL') | default('https://github.com/KlimVladMaks/recipe-hub.git', true) }}"
+branch: "{{ lookup('env', 'BRANCH') | default('main', true) }}"
+
+# Сервисы, у которых есть .env.example -> .env (см. роль app).
+services:
+  - api-gateway
+  - user
+  - recipe
+
+# Прод-стек: базовый compose + оверрайд (127.0.0.1, ротация логов).
+compose_flags: "-f docker-compose.yml -f deploy/docker-compose.prod.yml"
+
+# Health-эндпоинт шлюза, который опрашивается после старта стека.
+health_url: "http://127.0.0.1:3000/api/api-gateway-health"
+health_retries: 60
+health_delay: 3
+
+# --- Хост -------------------------------------------------------------
+timezone: Europe/Moscow
+
+# Swap страхует сборку образов от OOM на VPS с 2 ГБ RAM.
+swap_file: /swapfile
+swap_size_mb: 2048
+
+# --- nginx ------------------------------------------------------------
+# `_` = любой Host (работает и по IP, и по домену). При появлении домена
+# заменить здесь, а сертификат выпустить через certbot (см. deploy/README.md).
+nginx_server_name: "_"
+nginx_client_max_body_size: "20m"
+nginx_gateway_upstream: "127.0.0.1:3000"

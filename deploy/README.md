@@ -1,11 +1,13 @@
 # Развёртывание RecipeHub на удалённом сервере (VPS)
 
-Инструкция для ЛР4: развёртывание приложения на чистом VPS с Ubuntu и настройка
-nginx в режиме обратного прокси.
+Инструкция для ЛР4 / ДЗ по Ansible: развёртывание приложения на чистом VPS с
+Ubuntu, настройка nginx в режиме обратного прокси и управление сервером
+средствами **Ansible**.
 
 Вся конфигурация хранится в репозитории (принцип **Infrastructure as Code**) в
 каталоге `deploy/`. Свежий сервер поднимается **тремя командами**, а обновление —
-**одной**.
+**одной**. Настройка самого сервера описана декларативно в Ansible-ролях, а не
+в императивном bash-скрипте: повторный прогон playbook-а ничего не меняет.
 
 ## Структура `deploy/`
 
@@ -13,12 +15,27 @@ nginx в режиме обратного прокси.
 deploy/
 ├── README.md                    # этот файл
 ├── docker-compose.prod.yml      # прод-оверрайд: 127.0.0.1-порты, ротация логов, restart
-├── nginx/
-│   └── recipe-hub.conf          # конфиг обратного прокси (+ TLS-заготовка)
+├── ansible/                     # вся настройка сервера и деплой
+│   ├── ansible.cfg              # инвентарь по умолчанию, путь к ролям и коллекциям
+│   ├── requirements.yml         # коллекция community.general (ufw, timezone)
+│   ├── inventory/prod.yml       # хост recipe-hub; IP/юзер/ключ берутся из env
+│   ├── group_vars/all.yml       # app_dir, repo_url, branch, compose, nginx, swap
+│   ├── site.yml                 # «каким должен быть сервер» + первый деплой
+│   ├── deploy.yml               # обновление кода и пересборка (вызывается из CI)
+│   └── roles/
+│       ├── common/              # базовые пакеты, часовой пояс, swap
+│       ├── docker/              # Docker Engine, compose-plugin, ротация логов
+│       ├── firewall/            # UFW: SSH / 80 / 443
+│       ├── nginx/               # обратный прокси (шаблон конфига + handler)
+│       └── app/                 # код, services/*/.env, стек, health-check
 └── scripts/
-    ├── setup-server.sh          # первичная настройка VPS и развёртывание
-    └── deploy.sh                # обновление кода (используется и в CI на ДЗ6)
+    ├── setup-server.sh          # бутстрап: ставит Ansible и запускает site.yml
+    └── deploy.sh                # обновление кода: запускает deploy.yml
 ```
+
+Раньше `setup-server.sh` сам ставил Docker, swap, UFW и nginx. Теперь это роли
+playbook-а, а скрипты остались тонкими обёртками, чтобы привычные команды из
+этого README продолжали работать.
 
 ## Архитектура развёртывания
 
@@ -48,13 +65,24 @@ deploy/
 недоступны. Внутренние маршруты `/api/internal/*` дополнительно блокируются на
 уровне nginx.
 
+Управление сервером:
+
+```text
+   ноутбук (WSL)  ─┐
+                   ├─ SSH ──▶ VPS ──▶ ansible-playbook site.yml / deploy.yml
+   GitHub Actions ─┘
+```
+
 ## Требования
 
 - VPS с Ubuntu 22.04 / 24.04 (проверено под 24.04), root-доступ по SSH.
-- Минимум 2 ГБ RAM (скрипт добавит swap — он нужен, чтобы сборка образов не
+- Минимум 2 ГБ RAM (playbook добавит swap — он нужен, чтобы сборка образов не
   упала по OOM).
 - Открытые порты: `22/tcp` (SSH), `80/tcp`, `443/tcp`. Порты БД и RabbitMQ
   открывать не нужно.
+- Ansible ставится автоматически: `setup-server.sh` поднимет `ansible-core`
+  (из apt, при необходимости — в `/opt/ansible-venv`) и коллекцию
+  `community.general`.
 
 ## Быстрый старт (свежий сервер)
 
@@ -69,17 +97,21 @@ git clone https://github.com/KlimVladMaks/recipe-hub.git /opt/recipe-hub
 bash /opt/recipe-hub/deploy/scripts/setup-server.sh
 ```
 
-`setup-server.sh` автоматически:
+`setup-server.sh` — это бутстрап Ansible. Он:
 
-1. обновит систему и поставит базовые утилиты;
-2. создаст swap-файл 2 ГБ;
-3. установит Docker Engine и `docker compose` (compose-plugin);
-4. настроит UFW (разрешит SSH/80/443) и ротацию docker-логов;
-5. склонирует репозиторий в `/opt/recipe-hub` и сгенерирует `services/*/.env`
-   из `.env.example`;
-6. установит nginx и подключит `deploy/nginx/recipe-hub.conf`;
-7. соберёт и запустит стек с прод-оверрайдом;
-8. дождётся готовности API и напечатает адреса.
+1. ставит `ansible-core` >= 2.16 (сначала пробует apt, при неудаче — venv) и
+   коллекцию `community.general`;
+2. запускает `deploy/ansible/site.yml` с локальным подключением (`-c local`).
+
+Дальше всё делает playbook:
+
+| Роль | Что настраивает |
+| --- | --- |
+| `common` | кэш apt, базовые пакеты, часовой пояс, swap 2 ГБ (в `/etc/fstab`) |
+| `docker` | GPG-ключ и репозиторий Docker, `docker-ce` + compose-plugin, `/etc/docker/daemon.json` с ротацией логов, включение сервиса |
+| `firewall` | UFW: `22/80/443` открываются **до** включения файрвола, политики по умолчанию |
+| `nginx` | установка, конфиг из шаблона, symlink в `sites-enabled`, удаление дефолтного сайта, `nginx -t` перед reload |
+| `app` | `git clone/pull` в `app_dir`, `services/*/.env` из `.env.example`, `docker compose up -d --build`, ожидание health-эндпоинта |
 
 ### Альтернатива: одна команда
 
@@ -88,7 +120,73 @@ ssh root@<IP_СЕРВЕРА>
 curl -fsSL https://raw.githubusercontent.com/KlimVladMaks/recipe-hub/main/deploy/scripts/setup-server.sh | bash
 ```
 
-Скрипт сам клонирует репозиторий в `/opt/recipe-hub`.
+Скрипт сам клонирует репозиторий в `/opt/recipe-hub` (playbook-у нужен сам
+репозиторий) и запускает `site.yml`.
+
+## Ansible: повседневные команды
+
+Все команды — из каталога `deploy/ansible` (Ansible ищет `ansible.cfg` в текущем
+каталоге).
+
+### С ноутбука по SSH
+
+```bash
+cd deploy/ansible
+
+export SSH_HOST=<IP_СЕРВЕРА>            # те же имена, что у секретов GitHub Actions
+export SSH_USER=root
+export SSH_KEY=~/.ssh/id_ed25519        # необязательно, это значение по умолчанию
+
+ansible-playbook deploy.yml             # обновить приложение
+ansible-playbook site.yml               # настройка сервера + деплой
+```
+
+IP и пользователь в git не хранятся — инвентарь берёт их из переменных
+окружения (`deploy/ansible/inventory/prod.yml`).
+
+### На самом VPS
+
+```bash
+cd /opt/recipe-hub/deploy/ansible
+
+ansible-playbook -i localhost, -c local site.yml
+ansible-playbook -i localhost, -c local deploy.yml
+```
+
+Именно так работают обёртки `deploy/scripts/*.sh`.
+
+### Полезное
+
+```bash
+# предпросмотр: что изменится, без применения
+ansible-playbook site.yml --check --diff
+
+# только одна часть конфигурации
+ansible-playbook site.yml --tags nginx
+ansible-playbook site.yml --tags docker,firewall
+ansible-playbook site.yml --skip-tags swap
+
+# дерево инвентаря
+ansible-inventory --graph
+
+# проверка синтаксиса
+ansible-playbook site.yml --syntax-check
+```
+
+### Идемпотентность
+
+Playbook можно (и нужно) гонять повторно — он приводит сервер к описанному
+состоянию, а не «выполняет команды заново». Проверка:
+
+```bash
+ansible-playbook -i localhost, -c local site.yml --tags common,docker,firewall,nginx
+# → PLAY RECAP: changed=0
+```
+
+Единственная задача, которая всегда показывает `changed`, — `Собрать и
+запустить стек` (роль `app`): пересборка образов и есть деплой, даже если код не
+изменился. При этом `deploy.yml` (используется в CI) запускает только роль
+`app` и не переустанавливает пакеты.
 
 ## Проверка после развёртывания
 
@@ -113,9 +211,8 @@ curl http://<IP_СЕРВЕРА>/api/api-gateway-health
 bash /opt/recipe-hub/deploy/scripts/deploy.sh
 ```
 
-Скрипт сделает `git pull`, пересоберёт образы, перезапустит стек, удалит
-неиспользуемые образы и проверит health. Этот же скрипт вызывается из
-GitHub Actions — см. раздел «Автодеплой (GitHub Actions)».
+Скрипт запускает `deploy.yml`: `git pull` → пересборка образов → health-check.
+Этот же playbook вызывается из GitHub Actions — см. раздел «Автодеплой».
 
 ## Автодеплой (GitHub Actions)
 
@@ -127,10 +224,11 @@ git push origin main
         │
         ▼
 GitHub Actions runner (ubuntu-latest)
+        │  ставит ansible-core + community.general
         │  ssh (ключ из repository secrets)
         ▼
 VPS 139.100.225.216
-        │  bash /opt/recipe-hub/deploy/scripts/deploy.sh
+        │  ansible-playbook deploy.yml  (роль app)
         ▼
 git pull → docker compose up -d --build → health-check
 ```
@@ -141,10 +239,15 @@ git pull → docker compose up -d --build → health-check
   запускает), плюс ручной запуск (`workflow_dispatch`);
 - `concurrency: deploy-production` без отмены — два пуша подряд не запускают
   параллельные сборки на слабом сервере;
-- runner подключается к VPS по SSH отдельным ключом и вызывает тот же
-  `deploy/scripts/deploy.sh`, что и при ручном обновлении;
+- runner выкачивает репозиторий (нужен playbook), ставит Ansible в venv и
+  применяет `deploy/ansible/deploy.yml` по SSH: `SSH_HOST`, `SSH_USER` и
+  `SSH_KEY` передаются инвентарю через переменные окружения;
 - в конце — smoke-test: `curl http://<IP>/api/api-gateway-health` уже снаружи,
   через nginx.
+
+Полная настройка сервера (`site.yml`) из CI **не** запускается: она меняет
+пакеты, файрвол и конфиг nginx и нужна только при первичной настройке или
+осознанном изменении инфраструктуры.
 
 ### Секреты репозитория
 
@@ -171,12 +274,15 @@ gh run list
 # ручной перезапуск деплоя
 gh workflow run deploy.yml
 
+# прогнать workflow из другой ветки (проверка изменений в CI)
+gh workflow run deploy.yml --ref <ветка>
+
 # следить за последним прогоном
 gh run watch
 ```
 
 Также прогоны и логи видны на GitHub: вкладка **Actions**. Повторный прогон
-идемпотентен — `deploy.sh` безопасно вызывать несколько раз.
+идемпотентен.
 
 ## Секреты и переменные окружения
 
@@ -184,9 +290,10 @@ gh run watch
 `.env.example`). Схема такая:
 
 - `.env.example` содержит тестовые MVP-значения и используется локально;
-- на сервере `setup-server.sh` копирует `.env.example` → `.env`;
-- сгенерированные `.env` попадают в `.gitignore`, поэтому `git pull` их не
-  перезаписывает.
+- на сервере роль `app` копирует `.env.example` → `.env` **только если `.env`
+  ещё нет** (`copy` с `force: false`);
+- сгенерированные `.env` попадают в `.gitignore`, поэтому `git pull` и
+  повторные прогоны playbook-а их не перезаписывают.
 
 Это даёт задел под продакшен: чтобы уйти от тестовых секретов, достаточно
 отредактировать `services/*/.env` прямо на сервере (например, поменять
@@ -236,11 +343,16 @@ ssh -L 15672:127.0.0.1:15672 root@<IP_СЕРВЕРА>
 
 ## nginx и HTTPS
 
+Конфиг — **шаблон** `deploy/ansible/roles/nginx/templates/recipe-hub.conf.j2`,
+переменные (`server_name`, upstream, `client_max_body_size`) лежат в
+`deploy/ansible/group_vars/all.yml`. Правки на сервере напрямую перезапишутся
+следующим прогоном роли.
+
 Конфиг рассчитан на работу **по IP** (`server_name _`). Когда появится домен,
 направленный на сервер, включи HTTPS так:
 
-1. Поправь `deploy/nginx/recipe-hub.conf`: замени `server_name _;` на свой домен,
-   закоммить и скопируй конфиг на сервер (или отредактируй сразу на сервере).
+1. Задай домен в `nginx_server_name` (`group_vars/all.yml`), закоммить и примени
+   роль: `ansible-playbook site.yml --tags nginx`.
 2. Выпусти сертификат:
 
 ```bash
@@ -249,7 +361,8 @@ certbot --nginx -d recipe-hub.example.com
 ```
 
 Certbot сам добавит `listen 443 ssl` и автопродление. Готовый закомментированный
-TLS-блок и инструкция есть в конце `deploy/nginx/recipe-hub.conf`.
+TLS-блок и инструкция есть в конце шаблона. Помни: правки certbot живут только
+на сервере, пока TLS-блок не перенесён в шаблон.
 
 ## Запуск E2E-тестов против развёрнутого сервера
 
@@ -265,5 +378,15 @@ TEST_BASE_URL=http://<IP_СЕРВЕРА>/api npm test
 ## Восстановление на новом сервере
 
 Если сервер вышел из строя, возьми новый VPS и повтори раздел
-«Быстрый старт» — конфигурация и скрипты лежат в репозитории, ничего
+«Быстрый старт» — конфигурация и playbook-и лежат в репозитории, ничего
 восстанавливать вручную не нужно.
+
+## Частые проблемы
+
+| Симптом | Причина и решение |
+| --- | --- |
+| `Не найден ansible-playbook` | обёртка запущена не после `setup-server.sh`; поставь Ansible вручную: `apt install ansible-core` + `ansible-galaxy collection install -r deploy/ansible/requirements.yml` |
+| `couldn't resolve module/action 'community.general.ufw'` | не установлена коллекция: `ansible-galaxy collection install -r deploy/ansible/requirements.yml` |
+| `no hosts matched` / пустой инвентарь | не задан `SSH_HOST` или playbook запущен не из `deploy/ansible` |
+| `Permission denied (publickey)` | не указан ключ: `export SSH_KEY=~/.ssh/<ключ>` |
+| `api не ответил за 3 минуты` | смотри логи: `docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml logs -f` (обычно нехватка RAM/swap) |

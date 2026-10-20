@@ -1,0 +1,12 @@
+---
+- name: Проверить и перезагрузить nginx
+  # `template` не умеет валидировать фрагмент конфига, поэтому проверка
+  # всего конфига идёт перед reload: битый конфиг не уронит живой nginx.
+  ansible.builtin.shell: |
+    set -euo pipefail
+    nginx -t
+    systemctl reload nginx
+  args:
+    # /bin/sh на Ubuntu — это dash, а ему `set -o pipefail` незнаком.
+    executable: /bin/bash
+  changed_when: true

@@ -1,0 +1,38 @@
+# site.yml — «каким должен быть сервер» + развёртывание приложения.
+#
+# Полная настройка чистого VPS (Ubuntu 22.04/24.04) и запуск стека.
+# Playbook идемпотентен: на уже настроенном сервере он ничего не меняет
+# (кроме роли app, которая пересобирает образы).
+#
+# Запуск:
+#   cd deploy/ansible && ansible-playbook site.yml                     # по SSH
+#   cd deploy/ansible && ansible-playbook -i localhost, -c local site.yml  # на самом VPS
+#
+# Предпросмотр изменений без применения:
+#   ansible-playbook site.yml --check --diff
+#
+# Точечно по тегам:
+#   ansible-playbook site.yml --tags nginx
+---
+- name: Настройка VPS и развёртывание RecipeHub
+  hosts: all
+  become: true
+
+  pre_tasks:
+    - name: Проверить, что целевая ОС — Ubuntu 22.04+
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == 'Ubuntu'
+          - ansible_distribution_major_version | int >= 22
+        fail_msg: >-
+          Поддерживаются только Ubuntu 22.04 / 24.04, обнаружено
+          {{ ansible_distribution }} {{ ansible_distribution_version }}
+        quiet: true
+      tags: always
+
+  roles:
+    - { role: common, tags: [common] }
+    - { role: docker, tags: [docker] }
+    - { role: firewall, tags: [firewall] }
+    - { role: nginx, tags: [nginx] }
+    - { role: app, tags: [app] }
