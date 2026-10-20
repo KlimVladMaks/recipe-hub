@@ -1,0 +1,25 @@
+---
+# UFW: порты открываются ДО включения файрвола, иначе можно потерять SSH.
+- name: Разрешить SSH
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "22"
+    - "80"
+    - "443"
+
+- name: Политика по умолчанию для входящих — запретить
+  community.general.ufw:
+    direction: incoming
+    policy: deny
+
+- name: Политика по умолчанию для исходящих — разрешить
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
+
+- name: Включить UFW
+  community.general.ufw:
+    state: enabled

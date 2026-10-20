@@ -1,0 +1,5 @@
+---
+# Значения совпадают с уже настроенным на VPS /etc/docker/daemon.json,
+# поэтому на существующем сервере шаблон не вызовет рестарт Docker.
+docker_log_max_size: "10m"
+docker_log_max_file: "3"

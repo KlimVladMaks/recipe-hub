@@ -1,0 +1,24 @@
+# Инвентарь для продакшен-VPS.
+#
+# IP и пользователь в git не попадают — берутся из переменных окружения
+# (те же имена, что у секретов GitHub Actions в `.github/workflows/deploy.yml`):
+#
+#   export SSH_HOST=139.100.225.216
+#   export SSH_USER=root
+#   export SSH_KEY=~/.ssh/id_ed25519      # необязательно
+#
+# Запуск с ноутбука:
+#
+#   cd deploy/ansible && ansible-playbook deploy.yml
+#
+# На самом VPS инвентарь не нужен — playbook-и запускаются с локальным
+# подключением: `ansible-playbook -i localhost, -c local site.yml`
+# (так делают обёртки deploy/scripts/*.sh).
+all:
+  hosts:
+    recipe-hub:
+      ansible_host: "{{ lookup('env', 'SSH_HOST') }}"
+      ansible_user: "{{ lookup('env', 'SSH_USER') | default('root', true) }}"
+      ansible_ssh_private_key_file: >-
+        {{ lookup('env', 'SSH_KEY')
+           | default(lookup('env', 'HOME') ~ '/.ssh/id_ed25519', true) }}

@@ -59,10 +59,12 @@ docker compose up -d --build
 - Swagger UI: <http://localhost:3000/api-docs>
 - RabbitMQ UI: <http://localhost:15672> (guest / guest)
 
-## Развёртывание на VPS (ЛР4)
+## Развёртывание на VPS (ЛР4 / Ansible)
 
 Всё, что нужно для развёртывания на удалённом сервере, лежит в каталоге `deploy/`
-(принцип Infrastructure as Code). На чистом сервере Ubuntu достаточно трёх команд:
+(принцип Infrastructure as Code). Настройка сервера и деплой описаны декларативно
+средствами **Ansible** (`deploy/ansible/`: playbooks, роли, инвентарь). На чистом
+сервере Ubuntu достаточно трёх команд:
 
 ```bash
 ssh root@<IP_СЕРВЕРА>
@@ -71,11 +73,13 @@ git clone https://github.com/KlimVladMaks/recipe-hub.git /opt/recipe-hub
 bash /opt/recipe-hub/deploy/scripts/setup-server.sh
 ```
 
-Скрипт установит Docker, создаст swap, настроит UFW и nginx (обратный прокси),
-сгенерирует `services/*/.env` из `.env.example` и поднимет стек. Обновление — одной
-командой: `bash /opt/recipe-hub/deploy/scripts/deploy.sh`.
+Скрипт ставит Ansible и запускает `site.yml`: Docker, swap, UFW, nginx (обратный
+прокси), `services/*/.env` из `.env.example` и запуск стека. Обновление — одной
+командой: `bash /opt/recipe-hub/deploy/scripts/deploy.sh` (запускает `deploy.yml`).
+Playbook-и идемпотентны: повторный прогон ничего не меняет.
 
-Подробности, схема, секреты, TLS и туннели — в [`deploy/README.md`](deploy/README.md).
+Подробности, схема, секреты, TLS, туннели и команды Ansible — в
+[`deploy/README.md`](deploy/README.md).
 
 ## Запуск сервиса локально
 

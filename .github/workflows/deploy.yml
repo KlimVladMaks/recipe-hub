@@ -1,9 +1,14 @@
 name: Deploy to VPS
 
-# Автодеплой на удалённый VPS (ДЗ6).
+# Автодеплой на удалённый VPS (ДЗ6) + Ansible.
 #
 # Запускается только при пуше в main (работа в других ветках сборку на сервере
 # не триггерит) и вручную через кнопку "Run workflow" / `gh workflow run`.
+#
+# Деплой выполняет Ansible: runner подключается к VPS по SSH и применяет
+# deploy/ansible/deploy.yml (роль app: git pull -> пересборка -> health-check).
+# Настройка самого сервера — deploy/ansible/site.yml (запускается редко,
+# обычно через deploy/scripts/setup-server.sh).
 on:
   push:
     branches: [main]
@@ -23,6 +28,9 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Prepare SSH key and known_hosts
         run: |
           set -euo pipefail
@@ -31,14 +39,24 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Run deploy script on server
+      - name: Install Ansible
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/deploy_key \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            'bash /opt/recipe-hub/deploy/scripts/deploy.sh'
+          python3 -m venv "$RUNNER_TEMP/ansible-venv"
+          "$RUNNER_TEMP/ansible-venv/bin/pip" install --quiet --upgrade pip
+          "$RUNNER_TEMP/ansible-venv/bin/pip" install --quiet 'ansible-core>=2.16,<2.19'
+          echo "$RUNNER_TEMP/ansible-venv/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/ansible-venv/bin/ansible-galaxy" collection install \
+            -r deploy/ansible/requirements.yml
+
+      - name: Run Ansible deploy playbook on VPS
+        run: |
+          set -euo pipefail
+          export SSH_HOST="${{ secrets.SSH_HOST }}"
+          export SSH_USER="${{ secrets.SSH_USER }}"
+          export SSH_KEY="$HOME/.ssh/deploy_key"
+          cd deploy/ansible
+          ansible-playbook deploy.yml
 
       - name: Smoke test through nginx
         run: |

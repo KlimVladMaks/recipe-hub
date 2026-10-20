@@ -1,0 +1,18 @@
+# deploy.yml — обновление уже развёрнутого приложения (то, чем раньше был
+# deploy.sh): git pull -> пересборка образов -> health-check.
+#
+# Не ставит пакеты и не трогает конфиг хоста — для этого есть site.yml.
+# Ровно этот playbook вызывает GitHub Actions при пуше в main.
+#
+# Запуск:
+#   cd deploy/ansible && ansible-playbook deploy.yml                     # по SSH
+#   cd deploy/ansible && ansible-playbook -i localhost, -c local deploy.yml  # на самом VPS
+---
+- name: Обновление развёрнутого RecipeHub
+  hosts: all
+  become: true
+  # Роли app факты не нужны — пропускаем сбор фактов, чтобы деплой был быстрее.
+  gather_facts: false
+
+  roles:
+    - { role: app, tags: [app] }

@@ -1,0 +1,13 @@
+# Зависимости Ansible для RecipeHub.
+#
+# Устанавливаются одной командой:
+#
+#   ansible-galaxy collection install -r deploy/ansible/requirements.yml
+#
+# `ansible-core` в этот файл не входит: он ставится отдельно
+# (`apt install ansible-core`, `pip install ansible-core` или venv).
+---
+collections:
+  # ufw (роль firewall) и timezone (роль common).
+  - name: community.general
+    version: ">=9.0.0"

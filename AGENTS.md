@@ -31,12 +31,16 @@ Run from repo root unless noted.
 - Prisma: `npm run prisma:generate`, `npm run prisma:migrate` (`migrate deploy`). `DATABASE_URL` uses
   docker hostnames, so run these inside a container, not on the host.
 - Swagger UI: <http://localhost:3000/api-docs>; raw spec at `/openapi.json`.
+- Ansible (server config + deploy): `cd deploy/ansible` first, then `ansible-playbook site.yml`
+  (full host setup), `ansible-playbook deploy.yml` (update + rebuild), `--check --diff` to preview,
+  `--tags nginx|docker|firewall|common|app`, `--skip-tags swap`. Needs `SSH_HOST`/`SSH_USER` env
+  when run from a laptop; on the host itself add `-i localhost, -c local`.
 
 ## Production & auto-deploy — read before pushing
 
 - **Any push/merge to `main` deploys to the live VPS**: `.github/workflows/deploy.yml` → SSH →
-  `deploy/scripts/deploy.sh` (`git pull --ff-only` → rebuild → health check). Don't push or merge
-  to `main` unless the user explicitly asks; work on a branch.
+  `ansible-playbook deploy/ansible/deploy.yml` (role `app`: `git pull` → rebuild → health check).
+  Don't push or merge to `main` unless the user explicitly asks; work on a branch.
 - CI runs **no tests** — run `cd tests && npm test` locally before proposing a push.
 - Prod stack is `docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml` (ports
   bound to `127.0.0.1`, only nginx is public). Never `down -v` there — it deletes volumes.

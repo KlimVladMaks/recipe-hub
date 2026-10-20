@@ -1,0 +1,34 @@
+---
+# nginx как обратный прокси к api-gateway.
+- name: Установить nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+
+- name: Разложить конфиг обратного прокси
+  ansible.builtin.template:
+    src: recipe-hub.conf.j2
+    dest: /etc/nginx/sites-available/recipe-hub
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Проверить и перезагрузить nginx
+
+- name: Включить сайт
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/recipe-hub
+    dest: /etc/nginx/sites-enabled/recipe-hub
+    state: link
+  notify: Проверить и перезагрузить nginx
+
+- name: Убрать дефолтный сайт
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Проверить и перезагрузить nginx
+
+- name: Включить nginx
+  ansible.builtin.systemd:
+    name: nginx
+    enabled: true
+    state: started
