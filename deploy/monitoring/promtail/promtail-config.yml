@@ -55,3 +55,11 @@ scrape_configs:
       # Распаковывает json-file формат docker (поля log / stream / time)
       # в отдельные строки и метку времени.
       - docker: {}
+      # При первом запуске Promtail читает логи контейнеров с самого начала
+      # файла (у нас там 3 недели истории), а Loki отклоняет записи старше
+      # retention_period (7 дней) с ошибкой 400. Отбрасываем их здесь, чтобы
+      # не гонять по сети и не засорять лог ошибками. Значение должно совпадать
+      # с retention_period в loki-config.yml.
+      - drop:
+          older_than: 168h
+          drop_counter_reason: loki_retention
