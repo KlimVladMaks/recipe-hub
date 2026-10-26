@@ -1,0 +1,144 @@
+# Конфиг Prometheus для RecipeHub.
+#
+# Prometheus работает в network_mode: host, поэтому все локальные экспортёры
+# опрашиваются по 127.0.0.1:<порт>. blackbox-exporter публикуется на
+# 127.0.0.1:9115 и при этом живёт в bridge-сети приложения — сам резолвит
+# имена user-service / recipe-service / rabbitmq / *-db.
+#
+# Конфиг читается контейнером как есть, поэтому правки применяются так:
+#   docker compose ... up -d prometheus        (или --force-recreate prometheus)
+# либо без рестарта (включён --web.enable-lifecycle):
+#   curl -X POST http://127.0.0.1:9090/-/reload
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+  external_labels:
+    stack: recipe-hub
+
+scrape_configs:
+  # ---------------------------------------------------------------- self
+  - job_name: prometheus
+    static_configs:
+      - targets: ["127.0.0.1:9090"]
+        labels:
+          service: prometheus
+
+  # ---------------------------------------------- сама ВМ (CPU/RAM/диск/сеть)
+  - job_name: node
+    static_configs:
+      - targets: ["127.0.0.1:9100"]
+        labels:
+          service: node-exporter
+
+  # --------------------------------------------- ресурсы по каждому контейнеру
+  - job_name: cadvisor
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["127.0.0.1:8080"]
+        labels:
+          service: cadvisor
+
+  # --------------------------------------------------------------- Loki
+  - job_name: loki
+    static_configs:
+      - targets: ["127.0.0.1:3100"]
+        labels:
+          service: loki
+
+  - job_name: blackbox-exporter
+    static_configs:
+      - targets: ["127.0.0.1:9115"]
+        labels:
+          service: blackbox-exporter
+
+  # ------------------------------------------------------- healthcheck: HTTP
+  # Пробы health-эндпоинтов сервисов изнутри docker-сети.
+  - job_name: blackbox-http
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - http://api-gateway:3000/api/api-gateway-health
+        labels:
+          service: api-gateway
+          probe: http
+      - targets:
+          - http://user-service:3001/api/user-service-health
+        labels:
+          service: user-service
+          probe: http
+      - targets:
+          - http://recipe-service:3002/api/recipe-service-health
+        labels:
+          service: recipe-service
+          probe: http
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 127.0.0.1:9115
+
+  # --------------------------------------------- healthcheck: снаружи, через nginx
+  # Проверяет, что доступен не только шлюз, но и весь путь до него.
+  - job_name: blackbox-http-public
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - http://host.docker.internal/api/api-gateway-health
+        labels:
+          service: nginx
+          probe: http
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 127.0.0.1:9115
+
+  # -------------------------------------------------------- healthcheck: TCP
+  # У сервисов из этого списка нет HTTP-health, проверяем доступность порта.
+  - job_name: blackbox-tcp
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    static_configs:
+      - targets:
+          - user-db:5432
+        labels:
+          service: user-db
+          probe: tcp
+      - targets:
+          - recipe-db:5432
+        labels:
+          service: recipe-db
+          probe: tcp
+      - targets:
+          - rabbitmq:5672
+        labels:
+          service: rabbitmq
+          probe: tcp
+      - targets:
+          - loki:3100
+        labels:
+          service: loki
+          probe: tcp
+      - targets:
+          - blackbox-exporter:9115
+        labels:
+          service: blackbox-exporter
+          probe: tcp
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 127.0.0.1:9115

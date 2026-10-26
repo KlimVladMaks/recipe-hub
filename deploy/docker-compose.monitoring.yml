@@ -1,0 +1,216 @@
+# Стек мониторинга RecipeHub (ЛР: «Мониторинг микросервисов»).
+#
+# Подключается третьим файлом к базовому compose и прод-оверрайду:
+#
+#   docker compose -f docker-compose.yml \
+#                  -f deploy/docker-compose.prod.yml \
+#                  -f deploy/docker-compose.monitoring.yml up -d
+#
+# (в Ansible это уже прописано в compose_flags, см. group_vars/all.yml)
+#
+# Правила, которые здесь соблюдаются:
+#   * наружу не слушает НИЧЕГО: все адреса — 127.0.0.1, порты открываются
+#     только для SSH-туннеля (см. deploy/README.md, раздел «Мониторинг»);
+#   * у каждого контейнера есть mem_limit: на VPS 2 ГБ RAM, лимиты не дают
+#     мониторингу вытеснить приложение (OOM-killer сработает по лимиту);
+#   * включена ротация логов, чтобы не забить диск VPS.
+#
+# Почему часть сервисов в network_mode: host:
+#   * node-exporter и cadvisor должны видеть сеть/процессы/контейнеры САМОЙ ВМ,
+#     в bridge-сети они показывали бы только себя;
+#   * Prometheus и Grafana тоже в host-сети, иначе Prometheus не достучится до
+#     node-exporter/cadvisor (они слушают 127.0.0.1 хоста и из bridge недоступны),
+#     а Grafana — до Prometheus. Все они слушают только 127.0.0.1.
+#   * Loki, Promtail и blackbox остаются в bridge-сети приложения — им нужен
+#     DNS docker-сети (имена user-service, recipe-service, rabbitmq, ...).
+
+services:
+  # ---------------------------------------------------------------- Grafana
+  grafana:
+    image: grafana/grafana:12.4.13
+    container_name: recipe-hub-grafana
+    network_mode: host
+    restart: unless-stopped
+    mem_limit: 256m
+    # Пароль администратора лежит в deploy/monitoring/.env (в git только
+    # .env.example). Файл создаёт роль app при деплое, force: false.
+    env_file:
+      - ./deploy/monitoring/.env
+    environment:
+      # ВАЖНО: host-сеть, поэтому слушаем именно loopback и именно 3300 —
+      # порт 3000 на 127.0.0.1 уже занят api-gateway.
+      GF_SERVER_HTTP_ADDR: 127.0.0.1
+      GF_SERVER_HTTP_PORT: "3300"
+      GF_SERVER_ROOT_URL: http://localhost:3300
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      # Даташурсы и дашборд приезжают из git при старте контейнера.
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/recipe-hub.json
+      GF_LOG_MODE: console
+      GF_LOG_LEVEL: warn
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./deploy/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ------------------------------------------------------------- Prometheus
+  prometheus:
+    image: prom/prometheus:v3.13.5
+    container_name: recipe-hub-prometheus
+    network_mode: host
+    restart: unless-stopped
+    mem_limit: 320m
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.retention.size=2GB
+      - --web.listen-address=127.0.0.1:9090
+      - --web.enable-lifecycle
+    volumes:
+      - ./deploy/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------- node-exporter (ВМ)
+  # CPU / RAM / диск / сеть самой ВМ.
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    container_name: recipe-hub-node-exporter
+    network_mode: host
+    restart: unless-stopped
+    mem_limit: 48m
+    # pid: host — иначе контейнер видит только свои процессы.
+    pid: host
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/host/root
+      - --web.listen-address=127.0.0.1:9100
+      # Не показываем псевдо-ФС и слои Docker в панелях про диск.
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|var/lib/docker/.+)($|/)
+      - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro,rslave
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------- cAdvisor
+  # CPU / RAM / сеть по каждому контейнеру на ВМ (+ факт «контейнер жив»).
+  cadvisor:
+    image: ghcr.io/google/cadvisor:v0.60.6
+    container_name: recipe-hub-cadvisor
+    network_mode: host
+    restart: unless-stopped
+    mem_limit: 160m
+    privileged: true
+    devices:
+      - /dev/kmsg
+    command:
+      - --listen_ip=127.0.0.1
+      - --port=8080
+      - --docker_only=true
+      - --housekeeping_interval=30s
+      # Отключаем то, что не используем: меньше CPU и меньше серий в Prometheus.
+      - --disable_metrics=percpu,sched,tcp,udp,disk,diskIO,hugetlb,referenced_memory,cpu_topology,resctrl,advtcp,memory_numa
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ------------------------------------------------------------------ Loki
+  loki:
+    image: grafana/loki:3.6.19
+    container_name: recipe-hub-loki
+    restart: unless-stopped
+    mem_limit: 192m
+    command:
+      - -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./deploy/monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    # Нужен Promtail-у (loki:3100) и Grafana (127.0.0.1:3100).
+    ports:
+      - "127.0.0.1:3100:3100"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # --------------------------------------------------------------- Promtail
+  # Читает json-логи ВСЕХ контейнеров на ВМ и отправляет их в Loki.
+  promtail:
+    image: grafana/promtail:3.6.11
+    container_name: recipe-hub-promtail
+    restart: unless-stopped
+    mem_limit: 96m
+    command:
+      - -config.file=/etc/promtail/promtail-config.yml
+    depends_on:
+      - loki
+    volumes:
+      - ./deploy/monitoring/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      # Логи контейнеров + docker.sock для автообнаружения (docker_sd_configs).
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - promtail_positions:/var/lib/promtail
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ------------------------------------------------------ blackbox-exporter
+  # Healthcheck сервисов: HTTP-пробы health-эндпоинтов и TCP-пробы БД/RabbitMQ.
+  # Живёт в bridge-сети приложения, чтобы резолвить имена сервисов.
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.29.1
+    container_name: recipe-hub-blackbox
+    restart: unless-stopped
+    mem_limit: 32m
+    command:
+      - --config.file=/etc/blackbox/blackbox.yml
+      - --web.listen-address=:9115
+    # host.docker.internal нужен, чтобы проверять API снаружи — через nginx.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./deploy/monitoring/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+    ports:
+      - "127.0.0.1:9115:9115"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  grafana_data:
+  prometheus_data:
+  loki_data:
+  promtail_positions:
