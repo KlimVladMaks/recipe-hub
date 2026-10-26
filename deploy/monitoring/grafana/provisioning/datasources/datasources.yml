@@ -1,0 +1,36 @@
+# Даташурсы Grafana подключаются автоматически при старте контейнера.
+#
+# Prometheus и Grafana работают в network_mode: host, поэтому Prometheus
+# доступен по 127.0.0.1:9090. Loki опубликован на 127.0.0.1:3100.
+#
+# UID заданы явно: на них ссылаются панели дашборда из deploy/monitoring/
+# grafana/dashboards/recipe-hub.json. Не меняйте их без правки дашборда.
+
+apiVersion: 1
+
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
+  - name: Loki
+    orgId: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://127.0.0.1:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 15s
+      httpMethod: POST
+
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://127.0.0.1:3100
+    editable: false
+    jsonData:
+      maxLines: 5000

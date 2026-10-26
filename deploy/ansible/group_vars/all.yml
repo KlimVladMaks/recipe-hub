@@ -14,13 +14,27 @@ services:
   - user
   - recipe
 
-# Прод-стек: базовый compose + оверрайд (127.0.0.1, ротация логов).
-compose_flags: "-f docker-compose.yml -f deploy/docker-compose.prod.yml"
+# Прод-стек: базовый compose + оверрайд (127.0.0.1, ротация логов) + мониторинг
+# (Grafana / Prometheus / Loki / Promtail / node-exporter / cAdvisor / blackbox).
+#
+# Мониторинг — часть того же compose-проекта, поэтому поднимается той же ролью
+# app и тем же `docker compose up -d --build`; отдельного плейбука не нужно.
+# Порты мониторинга публикуются только на 127.0.0.1 (см. deploy/README.md).
+compose_flags: "-f docker-compose.yml -f deploy/docker-compose.prod.yml -f deploy/docker-compose.monitoring.yml"
+
+# Каталоги, в которых должен существовать .env: сначала сервисы (секреты
+# приложения), затем мониторинг (пароль администратора Grafana).
+monitoring_dir: "deploy/monitoring"
 
 # Health-эндпоинт шлюза, который опрашивается после старта стека.
 health_url: "http://127.0.0.1:3000/api/api-gateway-health"
 health_retries: 60
 health_delay: 3
+
+# Grafana поднимается вместе со стеком; её health API проверяется после деплоя,
+# чтобы упавший контейнер мониторинга не остался незамеченным.
+monitoring_health_url: "http://127.0.0.1:3300/api/health"
+monitoring_health_retries: 40
 
 # --- Хост -------------------------------------------------------------
 # Сервер (и логи контейнеров/CI) живут в UTC. Если нужен другой пояс,

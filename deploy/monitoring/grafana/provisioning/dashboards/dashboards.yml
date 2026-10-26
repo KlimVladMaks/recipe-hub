@@ -1,0 +1,22 @@
+# Провайдер дашбордов: Grafana читает JSON-файлы из /etc/grafana/dashboards
+# (в контейнер монтируется deploy/monitoring/grafana/dashboards).
+#
+# updateIntervalSeconds: 30 — если поправить JSON в репозитории и обновить файл
+# (docker compose ... up -d -> git pull -> перезапуск контейнера), Grafana
+# подхватит изменения без ручного импорта. allowUiUpdates: false — правки,
+# сделанные в UI, не сохраняются: источник правды — git.
+
+apiVersion: 1
+
+providers:
+  - name: recipe-hub
+    orgId: 1
+    folder: RecipeHub
+    folderUid: recipe-hub
+    type: file
+    disableDeletion: false
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards
+      foldersFromFilesStructure: false

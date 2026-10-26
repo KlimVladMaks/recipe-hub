@@ -10,17 +10,25 @@ adds the rules that matter when changing infra.
 ```text
 internet → nginx (80/443, the only public port) → 127.0.0.1:3000 api-gateway
         → docker network → user / recipe services, user-db, recipe-db, RabbitMQ
+
+monitoring (same compose project, all on 127.0.0.1):
+  grafana:3300 ──▶ prometheus:9090 ──▶ node-exporter:9100, cadvisor:8080
+       │                └────────────▶ blackbox-exporter:9115 (health probes)
+       └──────────▶ loki:3100 ◀── push ── promtail (all containers)
 ```
 
-`/api/internal/*` is answered with 403 by nginx. Host ports for the DBs, RabbitMQ, Prisma Studio
-and the gateway are bound to `127.0.0.1` — reach them with an SSH tunnel
-(`ssh -L 15672:127.0.0.1:15672 root@<host>`).
+`/api/internal/*` is answered with 403 by nginx. Host ports for the DBs, RabbitMQ, Prisma Studio,
+the gateway and monitoring are bound to `127.0.0.1` — reach them with an SSH tunnel
+(`ssh -L 15672:127.0.0.1:15672 root@<host>`, `ssh -L 3300:127.0.0.1:3300 root@<host>`).
 
 ## Files
 
 | Path | Role |
 |---|---|
 | `docker-compose.prod.yml` | prod override: `!override` 127.0.0.1 ports, log rotation, `restart: unless-stopped` |
+| `docker-compose.monitoring.yml` | monitoring stack (grafana/prometheus/loki/promtail/node-exporter/cadvisor/blackbox), mem limits, 127.0.0.1 only |
+| `monitoring/` | configs + Grafana provisioning/dashboards (`grafana/dashboards/recipe-hub.json` is the dashboard) |
+| `monitoring/.env.example` | `GF_SECURITY_ADMIN_*`; copied to `.env` by the `app` role (`force: false`) |
 | `ansible/` | all host configuration + deploy: playbooks `site.yml` / `deploy.yml`, roles, inventory, `group_vars` |
 | `ansible/group_vars/all.yml` | single place for `app_dir`, `repo_url`, `branch`, compose flags, health URL, swap, nginx vars |
 | `ansible/roles/nginx/templates/recipe-hub.conf.j2` | reverse proxy config (templated) + TLS stub at the end |
@@ -92,3 +100,21 @@ anything that must be installed on the host belongs in a new role under `deploy/
 (and gets added to `site.yml`). Keep it idempotent, secrets out of git, nothing published publicly,
 and verify by re-running the playbook twice. Record the resulting commands in `deploy/README.md`
 and update this file so the next session doesn't have to rediscover them.
+
+The monitoring stack already exists (`docker-compose.monitoring.yml` + `deploy/monitoring/`), so
+extend it instead of adding a parallel one:
+
+- Grafana/Prometheus/node-exporter/cadvisor run with `network_mode: host` (they must see the host
+  and each other) — **always** pass an explicit `127.0.0.1` listen address in that mode; Loki,
+  Promtail and blackbox stay on the compose bridge network so they can resolve service names.
+- Dashboards are provisioned from git (`allowUiUpdates: false`); edit `monitoring/grafana/dashboards/
+  recipe-hub.json`, never the UI. Datasource UIDs `prometheus` / `loki` are referenced by the JSON.
+- Promtail discovers containers via `docker_sd_configs`; new services need no config change.
+- Every container gets a `mem_limit` (VPS has 2 GB). Total limits are ~1.1 GB, real usage ~500 MB.
+  Prefer dropping cAdvisor over dropping health checks/logs if memory runs out.
+- After changing `prometheus.yml`: `curl -X POST http://127.0.0.1:9090/-/reload` (lifecycle API is
+  enabled) — no container restart needed. Validate configs with `promtool check config`,
+  `blackbox_exporter --config.check` (both runnable as one-shot containers).
+- `compose_flags` includes the monitoring file, so `deploy.yml` (and CI) ships monitoring changes
+  with a plain `git push`. Remember that the gates `/api/internal/*` block and the "nothing public"
+  rule still apply: monitoring is reachable only over an SSH tunnel.

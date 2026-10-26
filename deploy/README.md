@@ -15,6 +15,8 @@ Ubuntu, настройка nginx в режиме обратного прокси
 deploy/
 ├── README.md                    # этот файл
 ├── docker-compose.prod.yml      # прод-оверрайд: 127.0.0.1-порты, ротация логов, restart
+├── docker-compose.monitoring.yml # стек мониторинга: Grafana, Prometheus, Loki, ...
+├── monitoring/                  # конфиги мониторинга (провижининг Grafana, Loki, ...)
 ├── ansible/                     # вся настройка сервера и деплой
 │   ├── ansible.cfg              # инвентарь по умолчанию, путь к ролям и коллекциям
 │   ├── requirements.yml         # коллекция community.general (ufw, timezone)
@@ -364,6 +366,111 @@ Certbot сам добавит `listen 443 ssl` и автопродление. Г
 TLS-блок и инструкция есть в конце шаблона. Помни: правки certbot живут только
 на сервере, пока TLS-блок не перенесён в шаблон.
 
+## Мониторинг (Grafana + Prometheus + Loki + Promtail)
+
+Стек мониторинга — **часть того же compose-проекта**: он описан в
+`deploy/docker-compose.monitoring.yml` и подключён третьим `-f` в
+`compose_flags` (`deploy/ansible/group_vars/all.yml`). Отдельного плейбука нет:
+`docker compose up -d` поднимает приложение и мониторинг вместе.
+
+```text
+                       ┌─────────────────────────────┐
+   SSH-туннель ───────▶│ Grafana 127.0.0.1:3300       │  дашборд + Explore
+   (наружу не смотрит) └───────┬─────────────┬───────┘
+                               │             │
+                 Prometheus ───┘             └─── Loki 127.0.0.1:3100
+                 127.0.0.1:9090                    ▲
+                    │        │                     │ push
+        ┌───────────┴──┐  ┌──┴────────────┐   ┌────┴──────┐
+        │ node-exporter│  │  cAdvisor     │   │ Promtail  │
+        │ :9100 (ВМ)   │  │  :8080 (конт.)│   │ (все конт.)│
+        └──────────────┘  └───────────────┘   └───────────┘
+                    │
+             blackbox-exporter :9115 — HTTP/TCP-пробы сервисов
+```
+
+| Контейнер | Что делает | Порт |
+| --- | --- | --- |
+| `grafana` | UI, даташурсы и дашборд провижинятся из git | `127.0.0.1:3300` |
+| `prometheus` | сбор метрик, ретенция 15 дней / 2 ГБ | `127.0.0.1:9090` |
+| `loki` | хранилище логов, ретенция 7 дней | `127.0.0.1:3100` |
+| `promtail` | читает логи **всех** контейнеров через docker.sock | — |
+| `node-exporter` | CPU / RAM / диск / сеть самой ВМ | `127.0.0.1:9100` |
+| `cadvisor` | ресурсы по каждому контейнеру | `127.0.0.1:8080` |
+| `blackbox-exporter` | healthcheck сервисов (HTTP 200 / TCP connect) | `127.0.0.1:9115` |
+
+**Наружу не публикуется ничего** — все порты привязаны к `127.0.0.1`, поэтому
+Grafana открывается через SSH-туннель (так же, как RabbitMQ UI и Prisma Studio):
+
+```bash
+ssh -L 3300:127.0.0.1:3300 root@<IP_СЕРВЕРА>
+# затем в браузере: http://localhost:3300
+# логин admin, пароль — deploy/monitoring/.env (GF_SECURITY_ADMIN_PASSWORD)
+```
+
+### Что показывает дашборд
+
+Дашборд **RecipeHub — мониторинг** (`deploy/monitoring/grafana/dashboards/recipe-hub.json`)
+провижинится автоматически и открывается сразу после логина:
+
+1. **Healthcheck** — «все сервисы доступны / есть проблемы», плитки по
+   api-gateway, user-service, recipe-service, таблица всех проб (статус, время
+   ответа, HTTP-код) и график истории падений. HTTP-пробы идут по health-эндпоинтам,
+   БД и RabbitMQ проверяются TCP-коннектом.
+2. **ВМ** — CPU (общий, по ядрам, iowait/steal), RAM и swap, занятость диска и
+   дисковый I/O, сеть, load average.
+3. **Контейнеры** — CPU / RAM / сеть по каждому контейнеру (cAdvisor).
+4. **Логи** — переменная `$container`, все логи, только ошибки
+   (`error|fatal|exception|panic`) и график объёма логов по контейнерам.
+   Свободный поиск — Explore → Loki.
+
+### Полезные команды на сервере
+
+```bash
+cd /opt/recipe-hub
+COMPOSE="-f docker-compose.yml -f deploy/docker-compose.prod.yml -f deploy/docker-compose.monitoring.yml"
+
+docker compose $COMPOSE ps                      # все контейнеры, включая мониторинг
+docker compose $COMPOSE logs -f grafana         # логи конкретного
+docker compose $COMPOSE up -d prometheus        # перечитать конфиги после правки
+
+# проверки без Grafana
+curl -s 127.0.0.1:3300/api/health               # Grafana
+curl -s 127.0.0.1:3100/ready                    # Loki
+curl -s 127.0.0.1:9090/-/healthy                # Prometheus
+open/curl 127.0.0.1:9090/api/v1/targets         # состояние всех таргетов
+
+# куда уходит память (VPS 2 ГБ)
+docker stats --no-stream
+free -h
+```
+
+Перечитать конфиг Prometheus без рестарта (включён `--web.enable-lifecycle`):
+
+```bash
+curl -X POST http://127.0.0.1:9090/-/reload
+```
+
+### Обновление дашборда и конфигов
+
+Дашборд — обычный JSON в git. Меняй файл, коммить, пуш в `main`: деплой
+перезапустит Grafana, провижининг подхватит изменения (в UI правки не
+сохраняются — `allowUiUpdates: false`, источник правды только репозиторий).
+
+Promtail находит контейнеры сам (`docker_sd_configs`), поэтому новые сервисы
+появляются в логах без правки конфигов.
+
+### Память и ретенция
+
+На VPS 2 ГБ RAM у всех контейнеров мониторинга выставлены `mem_limit`
+(суммарно ~1.1 ГБ лимитов, реально ~500 МБ). Если памяти начнёт не хватать:
+
+1. отключи cAdvisor (панели «Контейнеры» пропадут, healthcheck и логи останутся);
+2. уменьши `--storage.tsdb.retention.time` / `retention_period` у Loki.
+
+Пароль Grafana: `deploy/monitoring/.env` (в git только `.env.example`, на
+сервере файл создаётся один раз и не перезаписывается).
+
 ## Запуск E2E-тестов против развёрнутого сервера
 
 Тесты чёрного ящика ходят через API-шлюз по HTTP, поэтому их можно направить на
@@ -390,3 +497,6 @@ TEST_BASE_URL=http://<IP_СЕРВЕРА>/api npm test
 | `no hosts matched` / пустой инвентарь | не задан `SSH_HOST` или playbook запущен не из `deploy/ansible` |
 | `Permission denied (publickey)` | не указан ключ: `export SSH_KEY=~/.ssh/<ключ>` |
 | `api не ответил за 3 минуты` | смотри логи: `docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml logs -f` (обычно нехватка RAM/swap) |
+| Grafana: в дашборде «НЕТ ДАННЫХ» у логов | Promtail не видит docker.sock или Loki не готов; проверь `docker compose ... logs promtail` и `curl 127.0.0.1:3100/ready` |
+| Панели «Контейнеры» пустые | cAdvisor не стартовал (несовместимость с версией Docker); `docker compose ... logs cadvisor`; при необходимости убери его из `deploy/docker-compose.monitoring.yml` |
+| Контейнеры мониторинга падают с OOM | на VPS 2 ГБ: проверь `docker stats --no-stream`; убери cAdvisor и/или уменьши ретенцию Prometheus/Loki |

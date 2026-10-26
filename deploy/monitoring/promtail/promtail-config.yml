@@ -1,0 +1,57 @@
+# Promtail: собирает stdout/stderr ВСЕХ контейнеров на ВМ и отправляет в Loki.
+#
+# Ничего перечислять вручную не нужно: docker_sd_configs автоматически находит
+# запущенные контейнеры через docker.sock (включая будущие), а файл логов
+# контейнера подставляется в __path__ автоматически. Поэтому «просмотр логов
+# со всех контейнеров» работает и для новых сервисов без правки этого файла.
+
+server:
+  http_listen_address: 0.0.0.0
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: warn
+
+positions:
+  filename: /var/lib/promtail/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    batchwait: 1s
+    batchsize: 1048576
+    backoff_config:
+      min_period: 500ms
+      max_period: 5s
+      max_retries: 10
+
+scrape_configs:
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 15s
+        filters:
+          - name: status
+            values: ["running"]
+    relabel_configs:
+      # Имя контейнера без ведущего слэша: recipe-hub-api-gateway-1, user-db, ...
+      - source_labels: ["__meta_docker_container_name"]
+        regex: "/(.*)"
+        target_label: container
+      # Имя сервиса из compose (api-gateway, user-db, ...) — удобно для $service.
+      - source_labels: ["__meta_docker_container_label_com_docker_compose_service"]
+        target_label: service
+      - source_labels: ["__meta_docker_container_label_com_docker_compose_project"]
+        target_label: project
+      - source_labels: ["__meta_docker_container_label_com_docker_compose_profile"]
+        target_label: profile
+      - source_labels: ["__meta_docker_container_log_stream"]
+        target_label: stream
+      - source_labels: ["__meta_docker_container_id"]
+        target_label: container_id
+      # Promtail не должен пересылать собственный лог самому себе.
+      - source_labels: ["__meta_docker_container_name"]
+        regex: "/recipe-hub-promtail"
+        action: drop
+    pipeline_stages:
+      # Распаковывает json-file формат docker (поля log / stream / time)
+      # в отдельные строки и метку времени.
+      - docker: {}

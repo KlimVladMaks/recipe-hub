@@ -31,6 +31,23 @@
     label: "{{ item.item }}"
   when: item.stat.exists
 
+# Пароль администратора Grafana. Та же логика, что и у services/*/.env:
+# в git только .env.example, на сервере файл создаётся один раз и дальше
+# не перезаписывается — пароль можно сменить руками.
+- name: Проверить наличие шаблона .env для мониторинга
+  ansible.builtin.stat:
+    path: "{{ app_dir }}/{{ monitoring_dir }}/.env.example"
+  register: app_monitoring_env_example
+
+- name: Создать deploy/monitoring/.env из .env.example (если ещё нет)
+  ansible.builtin.copy:
+    src: "{{ app_dir }}/{{ monitoring_dir }}/.env.example"
+    dest: "{{ app_dir }}/{{ monitoring_dir }}/.env"
+    remote_src: true
+    force: false
+    mode: "0600"
+  when: app_monitoring_env_example.stat.exists
+
 # `docker compose up --build` — единственное место, где нужен shell-out:
 # модуль community.docker.docker_compose_v2 тянет лишнюю коллекцию и хуже
 # переносит долгую сборку образов на VPS с 2 ГБ RAM.
@@ -59,4 +76,24 @@
       RecipeHub готов: {{ health_url }}
       (внешний адрес — http://<IP_СЕРВЕРА>/api/api-gateway-health,
       логи — cd {{ app_dir }} && docker compose {{ compose_flags }} logs -f)
+  when: not ansible_check_mode
+
+# Мониторинг поднимается тем же `up -d`, что и приложение, поэтому проверяем,
+# что Grafana действительно отвечает. Без этого «зелёный» деплой мог бы скрыть
+# упавший контейнер (например, OOM на VPS с 2 ГБ).
+- name: Дождаться готовности Grafana
+  ansible.builtin.uri:
+    url: "{{ monitoring_health_url }}"
+    status_code: 200
+  register: app_monitoring_health
+  until: app_monitoring_health.status | default(0) == 200
+  retries: "{{ monitoring_health_retries }}"
+  delay: "{{ health_delay }}"
+  changed_when: false
+
+- name: Показать адрес Grafana
+  ansible.builtin.debug:
+    msg: >-
+      Мониторинг готов: ssh -L 3300:127.0.0.1:3300 root@<IP_СЕРВЕРА>,
+      затем http://localhost:3300 (дашборд «RecipeHub — мониторинг»)
   when: not ansible_check_mode

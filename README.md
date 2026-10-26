@@ -78,6 +78,19 @@ bash /opt/recipe-hub/deploy/scripts/setup-server.sh
 командой: `bash /opt/recipe-hub/deploy/scripts/deploy.sh` (запускает `deploy.yml`).
 Playbook-и идемпотентны: повторный прогон ничего не меняет.
 
+Вместе с приложением поднимается **мониторинг**: Grafana, Prometheus, Loki,
+Promtail, node-exporter, cAdvisor и blackbox-exporter
+(`deploy/docker-compose.monitoring.yml`). Наружу он не публикуется — Grafana
+открывается через SSH-туннель:
+
+```bash
+ssh -L 3300:127.0.0.1:3300 root@<IP_СЕРВЕРА>
+# затем http://localhost:3300 — дашборд «RecipeHub — мониторинг»
+```
+
+Дашборд показывает потребление CPU/RAM/диска/сети на ВМ, healthcheck всех
+сервисов и логи всех контейнеров.
+
 Подробности, схема, секреты, TLS, туннели и команды Ansible — в
 [`deploy/README.md`](deploy/README.md).
 
@@ -143,7 +156,7 @@ services/
 docs/
   openapi.yaml     # OpenAPI-спецификация публичного и внутреннего API
 tests/             # E2E-тесты (node:test + tsx) и Postman-коллекция
-deploy/            # Infrastructure as Code: nginx, скрипты, prod-compose
+deploy/            # Infrastructure as Code: nginx, скрипты, prod-compose, мониторинг
 .github/workflows/ # CI: автодеплой на VPS при push в main
 docker-compose.yml
 AGENTS.md          # заметки для ИИ-агентов и разработчиков
