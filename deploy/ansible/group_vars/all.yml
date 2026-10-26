@@ -26,6 +26,21 @@ compose_flags: "-f docker-compose.yml -f deploy/docker-compose.prod.yml -f deplo
 # приложения), затем мониторинг (пароль администратора Grafana).
 monitoring_dir: "deploy/monitoring"
 
+# Сервисы мониторинга, которые пересоздаются при изменении конфигов
+# (см. роль app: хеш конфигов + --force-recreate). blackbox и promtail
+# читают конфиг при старте, поэтому им тоже нужен перезапуск.
+monitoring_services:
+  - grafana
+  - prometheus
+  - loki
+  - promtail
+  - blackbox-exporter
+
+# Файл с хешем конфигов мониторинга от прошлого деплоя (вне git и вне app_dir,
+# чтобы не засорять рабочее дерево git pull).
+monitoring_state_dir: /var/lib/recipe-hub
+monitoring_state_file: "{{ monitoring_state_dir }}/monitoring-config.sha1"
+
 # Health-эндпоинт шлюза, который опрашивается после старта стека.
 health_url: "http://127.0.0.1:3000/api/api-gateway-health"
 health_retries: 60

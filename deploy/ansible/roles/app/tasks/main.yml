@@ -60,6 +60,62 @@
     chdir: "{{ app_dir }}"
   changed_when: true
 
+# Конфиги мониторинга (prometheus.yml, loki-config.yml, promtail-config.yml,
+# дашборд, ...) монтируются в контейнеры как файлы. Docker Compose не считает
+# изменение содержимого bind-mount причиной пересоздать контейнер, поэтому
+# `up -d` после `git pull` применил бы новые настройки только частично.
+# Считаем хеш конфигов и пересоздаём контейнеры мониторинга при его изменении.
+- name: Посчитать хеш конфигов мониторинга
+  ansible.builtin.shell: |
+    set -o pipefail
+    find {{ app_dir }}/{{ monitoring_dir }} -type f ! -name '.env' -print0 \
+      | sort -z | xargs -0 sha1sum | sha1sum | cut -d' ' -f1
+  args:
+    executable: /bin/bash
+  register: app_monitoring_hash
+  changed_when: false
+  check_mode: false
+
+- name: Прочитать хеш конфигов с прошлого деплоя
+  ansible.builtin.slurp:
+    src: "{{ monitoring_state_file }}"
+  register: app_monitoring_hash_previous
+  failed_when: false
+  check_mode: false
+
+- name: Создать каталог для файла состояния
+  ansible.builtin.file:
+    path: "{{ monitoring_state_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: >-
+    app_monitoring_hash_previous.content is not defined
+    or (app_monitoring_hash_previous.content | b64decode | trim) != app_monitoring_hash.stdout
+
+- name: Пересоздать контейнеры мониторинга при изменении конфигов
+  ansible.builtin.command:
+    cmd: >-
+      docker compose {{ compose_flags }} up -d --force-recreate
+      {{ monitoring_services | join(' ') }}
+    chdir: "{{ app_dir }}"
+  when: >-
+    app_monitoring_hash_previous.content is not defined
+    or (app_monitoring_hash_previous.content | b64decode | trim) != app_monitoring_hash.stdout
+  changed_when: true
+
+- name: Запомнить хеш конфигов мониторинга
+  ansible.builtin.copy:
+    content: "{{ app_monitoring_hash.stdout }}\n"
+    dest: "{{ monitoring_state_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: >-
+    app_monitoring_hash_previous.content is not defined
+    or (app_monitoring_hash_previous.content | b64decode | trim) != app_monitoring_hash.stdout
+
 - name: Дождаться готовности API
   ansible.builtin.uri:
     url: "{{ health_url }}"
