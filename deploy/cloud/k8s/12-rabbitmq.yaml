@@ -55,7 +55,11 @@ spec:
               cpu: 500m
               memory: 384Mi
           readinessProbe:
+            # rabbitmq-diagnostics не укладывается в секунду по умолчанию,
+            # поэтому таймаут увеличен.
             exec:
               command: ["rabbitmq-diagnostics", "-q", "check_port_connectivity"]
-            initialDelaySeconds: 10
+            initialDelaySeconds: 15
             periodSeconds: 10
+            timeoutSeconds: 15
+            failureThreshold: 6

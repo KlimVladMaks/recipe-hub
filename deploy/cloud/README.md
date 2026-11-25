@@ -4,9 +4,8 @@
 пока стенд нужен — он работает; после тестов и защиты — удаляется, и мы за
 него не платим.
 
-> Статус: каркас. Terraform-провайдер и структура каталогов готовы, платные
-> ресурсы ещё не создаются. Следующий шаг — VPC, IAM, Managed Kubernetes,
-> Container Registry и группа узлов.
+> Статус: инфраструктура и манифесты готовы, стенд проверяется на живом
+> кластере. CI/CD, ДЗ7 и ДЗ9 — следующие шаги.
 
 ## Архитектура
 
@@ -63,17 +62,36 @@ Production-вариант (для текста ДЗ7) отличается: тр
 
 ## Жизненный цикл
 
+Все команды — из каталога `deploy/cloud`:
+
 ```bash
-make up       # создать инфраструктуру и ingress, ~15–25 мин
-make deploy   # выкатить приложение, ~2–5 мин
-make test     # smoke + E2E + Postman
-make pause    # остановить кластер на короткий перерыв
-make resume   # вернуть кластер
-make down     # удалить всё платное, ~10 мин
-make status   # проверить, не осталось ли ресурсов
+make up       # создать инфраструктуру и дождаться узлов, ~10–20 мин
+make build    # собрать три образа и запушить в Container Registry
+make deploy   # применить манифесты, дождаться rollout, вывести URL
+make smoke    # health всех сервисов + Swagger UI
+make test     # smoke + E2E-тесты (tests/, чёрный ящик)
+make url      # текущий адрес стенда
+make status   # что создано и не осталось ли платных «сирот»
+make pause    # остановить кластер (мастер и узлы не тарифицируются)
+make resume   # вернуть кластер после pause
+make down     # удалить namespace, NLB, PVC и весь Terraform-стенд
 ```
 
-Пока Makefile и скрипты не добавлены — это план, а не готовые команды.
+`make up` требует авторизованного `yc` (достаточно один раз выполнить `yc init`).
+Terraform получает IAM-токен через `yc iam create-token` автоматически.
+
+### Секреты
+
+`make deploy` генерирует `deploy/cloud/.secrets.env` (в `.gitignore`) и создаёт
+из него Kubernetes Secret `recipehub-secrets`: `JWT_SECRET`, пароли PostgreSQL,
+RabbitMQ и bootstrap-админа. Файл переиспользуется между сессиями, поэтому
+переменные окружения в кластере не «прыгают» от запуска к запуску.
+
+### Образы
+
+Образы собираются локально (`make build`) и пушатся в `cr.yandex/<registry-id>`
+с тегом `git short sha` (+ `-dirty`, если рабочее дерево грязное). Приложение
+не хранит данные между сессиями, поэтому пересборка при каждом запуске — норма.
 
 ## Правила безопасности и экономии
 
@@ -92,13 +110,23 @@ make status   # проверить, не осталось ли ресурсов
 
 ## Что дальше
 
-1. VPC + подсеть + security groups.
-2. IAM: сервисные аккаунты для кластера, узлов и CI.
-3. Managed K8s + node group (preemptible).
-4. Container Registry.
-5. K8s-манифесты приложения, PostgreSQL, RabbitMQ и ingress.
-6. GitHub Actions: сборка/пуш/деплой + отдельный workflow для Terraform.
-7. MkDocs, Postman environment, OpenAPI `servers`, технический дизайн ДЗ7.
+1. ДЗ7 — технический дизайн облачной инфраструктуры (`docs/cloud/`).
+2. ДЗ8 — GitHub Actions: сборка/пуш образов, деплой в кластер, отдельный
+   workflow для Terraform (`plan` / `apply` / `destroy` по кнопке).
+3. ДЗ9 — MkDocs, Postman environment для облака, OpenAPI `servers`.
+4. ДЗ10 / ЛР8 — k6, HPA и лимиты ресурсов (в кластере уже включён
+   Cluster Autoscaler, чтобы это не пересоздавать).
 
-Пока ни один из этих шагов не создаёт платных ресурсов: `terraform validate`
-и `kubectl kustomize` можно запускать без облака.
+## Проверка без облака
+
+`terraform validate`, `terraform plan` и `kubectl apply --dry-run=client`
+работают без создания платных ресурсов:
+
+```bash
+cd deploy/cloud/terraform
+terraform init -backend=false
+terraform validate
+
+cd ../..
+kubectl apply --dry-run=client -f deploy/cloud/k8s/
+```

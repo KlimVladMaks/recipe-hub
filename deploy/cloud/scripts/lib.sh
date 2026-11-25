@@ -42,7 +42,7 @@ kubeconfig() {
   local id
   id="$(tf_out cluster_id)"
   [ -n "$id" ] || die "кластер не найден — сначала make up"
-  yc managed-kubernetes cluster get-credentials --id "$id" --external --force >/dev/null
+  yc managed-kubernetes cluster get-credentials --id "$id" --external --force >/dev/null 2>&1
   kubectl config current-context >/dev/null
 }
 

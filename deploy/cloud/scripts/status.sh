@@ -19,7 +19,7 @@ fi
 
 log "платные ресурсы вне Terraform (проверяем, что ничего не забыто)"
 echo '--- сетевые балансировщики ---'
-yc network-load-balancer list 2>/dev/null || true
+yc load-balancer network-load-balancer list 2>/dev/null || true
 echo '--- публичные IP ---'
 yc vpc address list 2>/dev/null || true
 echo '--- диски ---'

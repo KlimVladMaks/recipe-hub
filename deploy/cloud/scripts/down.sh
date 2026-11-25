@@ -15,7 +15,7 @@ else
 
   log "жду, пока облако удалит сетевой балансировщик (до 5 мин)"
   for i in $(seq 1 60); do
-    if [ -z "$(yc network-load-balancer list --format json 2>/dev/null | tr -d '[]\n ' )" ]; then
+    if [ -z "$(yc load-balancer network-load-balancer list --format json 2>/dev/null | tr -d '[]\n ' )" ]; then
       break
     fi
     sleep 5
@@ -31,7 +31,7 @@ log "проверяю остатки"
 leftovers=0
 for check in \
   "yc managed-kubernetes cluster list" \
-  "yc network-load-balancer list" \
+  "yc load-balancer network-load-balancer list" \
   "yc vpc address list" \
   "yc compute disk list"; do
   out="$($check 2>/dev/null || true)"
