@@ -94,13 +94,18 @@ ssh -L 3300:127.0.0.1:3300 root@<IP_СЕРВЕРА>
 Подробности, схема, секреты, TLS, туннели и команды Ansible — в
 [`deploy/README.md`](deploy/README.md).
 
-## Облачный стенд (Yandex Cloud, в разработке)
+## Облачный стенд (Yandex Cloud)
 
 Сейчас основной стенд для раздела 4 дисциплины — одноразовый кластер
 Yandex Managed Service for Kubernetes. Он поднимается через Terraform только
 на время тестов/защиты и удаляется командой `down`, чтобы не платить за
 простой. План, архитектура и правила экономии — в
 [`deploy/cloud/README.md`](deploy/cloud/README.md).
+
+Технический дизайн облачной инфраструктуры (ДЗ7): архитектурные решения,
+облачные ресурсы, сетевая связность, отказоустойчивость, безопасность,
+стоимость и production-вариант — в
+[`docs/cloud/technical-design.md`](docs/cloud/technical-design.md).
 
 > VPS из ЛР4/ЛР5/ЛР6 удалён после защиты. Старый workflow автодеплоя на VPS
 > отключён (`.github/workflows/deploy-vps.yml.disabled`); не включайте его без

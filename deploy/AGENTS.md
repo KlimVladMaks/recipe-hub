@@ -92,6 +92,9 @@ Disposable Managed Kubernetes stand in Yandex Cloud. Lifecycle is
   boot disk. Request an increase (`yc quota-manager quota-request create`, usually approved at once).
 - Do **not** add a Terraform `apply` step to CI without an explicit human confirmation — an
   accidentally created cluster costs money every hour.
+- The design rationale (why one zone, preemptible nodes, in-cluster PostgreSQL, NLB instead of
+  ingress/ALB) lives in `docs/cloud/technical-design.md`; keep it consistent with `terraform/`
+  and `k8s/` when you change either.
 
 ## CI
 

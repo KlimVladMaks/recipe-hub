@@ -4,8 +4,10 @@
 пока стенд нужен — он работает; после тестов и защиты — удаляется, и мы за
 него не платим.
 
-> Статус: инфраструктура и манифесты готовы, стенд проверяется на живом
-> кластере. CI/CD, ДЗ7 и ДЗ9 — следующие шаги.
+> Статус: инфраструктура, манифесты и скрипты готовы; стенд проверен на живом
+> кластере (52 E2E-теста) и погашен. Технический дизайн —
+> [`docs/cloud/technical-design.md`](../../docs/cloud/technical-design.md).
+> Дальше: ДЗ8 (CI/CD) и ДЗ9 (документация).
 
 ## Архитектура
 
@@ -14,33 +16,32 @@
    │  HTTP :80
    ▼
 Yandex NLB (публичный IP)
-   │
+   │  NodePort 30000–32767
    ▼
-ingress-nginx (в кластере)
-   │
-   ▼
-api-gateway :3000
+Service type=LoadBalancer → api-gateway :3000
    ├── user-service :3001 ── user-db (PostgreSQL, PVC)
    └── recipe-service :3002 ─ recipe-db (PostgreSQL, PVC)
                          └── RabbitMQ
 ```
 
 - **Managed Service for Kubernetes**: зональный мастер `s-c2-m8`,
-  одна группа узлов (1 × preemptible 2 vCPU / 4 ГБ, `standard-v4a`,
+  одна группа узлов (1 × preemptible 2 vCPU / 4 ГБ, `standard-v3`,
   boot disk 64 ГБ HDD, публичный IP).
 - **PostgreSQL и RabbitMQ** — внутри кластера, без Managed-сервисов:
   для учебного стенда это заметно дешевле, а данные между сессиями
   всё равно не сохраняются.
-- **Container Registry** — образы собираются в GitHub Actions.
+- **Container Registry** — образы собираются локально (`make build`),
+  в ДЗ8 сборка переедет в GitHub Actions.
 - **NLB** — создаётся автоматически из `Service type=LoadBalancer`
-  для ingress-nginx.
+  для `api-gateway`; отдельного ingress-контроллера на стенде нет.
 - **Секреты** — K8s Secrets из GitHub Secrets или локального
   `.secrets.env` (в git не попадает).
 
 Production-вариант (для текста ДЗ7) отличается: три зоны, региональный
 мастер, несколько узлов, Managed PostgreSQL, ALB + TLS, Lockbox, Monium
 и регулярные бэкапы. В стенде эти вещи сознательно не поднимаются, чтобы
-не платить за избыточную для учебной задачи инфраструктуру.
+не платить за избыточную для учебной задачи инфраструктуру. Подробное
+сравнение — раздел 11 в [`technical-design.md`](../../docs/cloud/technical-design.md).
 
 ## Стоимость (ориентир, ru-central1)
 
@@ -57,7 +58,7 @@ Production-вариант (для текста ДЗ7) отличается: тр
 | **Итого** | | **~10 ₽/час** |
 
 Ориентиры: 1 час теста — ~10 ₽, 4 часа — ~40 ₽, 8 часов — ~80 ₽.
-Остановленный кластер (`pause`) — ~1,7 ₽/час, полностью удалённый (`down`) —
+Остановленный кластер (`pause`) — ~2 ₽/час, полностью удалённый (`down`) —
 почти 0 ₽. Оставить кластер на месяц — ~7 200 ₽, поэтому `down` обязателен.
 
 ## Жизненный цикл
@@ -146,7 +147,8 @@ yc quota-manager quota-limit list --service compute \
 
 ## Что дальше
 
-1. ДЗ7 — технический дизайн облачной инфраструктуры (`docs/cloud/`).
+1. ~~ДЗ7 — технический дизайн облачной инфраструктуры~~ — готов:
+   [`docs/cloud/technical-design.md`](../../docs/cloud/technical-design.md).
 2. ДЗ8 — GitHub Actions: сборка/пуш образов, деплой в кластер, отдельный
    workflow для Terraform (`plan` / `apply` / `destroy` по кнопке).
 3. ДЗ9 — MkDocs, Postman environment для облака, OpenAPI `servers`.

@@ -7,7 +7,9 @@ monorepo; no root `package.json` — each service and `tests/` are independent n
 subscriptions, feed) is feature-complete. Section 3 (VPS deploy, Ansible, monitoring) is done;
 **the VPS has been deleted** after the defence. Section 4 is now the active work: a disposable
 Managed Kubernetes stand in Yandex Cloud (`deploy/cloud/`), plus cloud CI/CD and docs.
-Product scope and architecture diagram: `README.md`.
+Product scope and architecture diagram: `README.md`. The section-4 technical design (ДЗ7) is
+`docs/cloud/technical-design.md` — when you change infrastructure, update it too (it has a
+"соответствие реализации" table that maps every design claim to a file).
 
 ## Services
 
