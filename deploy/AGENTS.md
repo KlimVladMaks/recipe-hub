@@ -1,9 +1,16 @@
 # deploy/ — infrastructure & operations (agent notes)
 
-Everything that is not application code: the prod compose override, nginx, setup/deploy scripts
-and, later, Ansible and monitoring. **Put new infrastructure here, not in the repo root.**
-The full runbook (in Russian) is `deploy/README.md`; this file is the agent-facing summary and
-adds the rules that matter when changing infra.
+Everything that is not application code. Two independent stacks live here:
+
+| Path | What it is | Status |
+|---|---|---|
+| `deploy/ansible/`, `deploy/scripts/`, `docker-compose.prod.yml`, `docker-compose.monitoring.yml`, `deploy/monitoring/` | Section 3: VPS deploy, Ansible, monitoring | **archived** — the VPS was deleted after the defence |
+| `deploy/cloud/` | Section 4: disposable Yandex Cloud Managed Kubernetes stand | **active** |
+
+`deploy/README.md` documents the VPS/Ansible stack (kept as history and for the report);
+`deploy/cloud/README.md` documents the cloud stand. This file is the agent-facing summary.
+
+**Put new infrastructure under `deploy/`, never in the repo root.**
 
 ## Topology
 
@@ -63,6 +70,28 @@ otherwise SSH dies), `nginx` (template + `nginx -t` before reload), `app` (git, 
   -v $PWD:/repo geerlingguy/docker-ubuntu2404-ansible` then run `site.yml --tags
   common,firewall,nginx,docker` inside (`swapon` does not work in a container — use
   `--skip-tags swap`).
+
+## Cloud stand (`deploy/cloud/`)
+
+Disposable Managed Kubernetes stand in Yandex Cloud. Lifecycle is
+`make up` → `make build` → `make deploy` → `make smoke`/`make test` → `make down`
+(run from `deploy/cloud`). It is **paid by the hour** — `make down` is not optional.
+
+- `terraform/` — VPC, subnet, 3 security groups, 2 service accounts + IAM, zonal K8s master
+  (`s-c2-m8`, Calico), one preemptible node (2 vCPU / 50% / 4 GiB, 64 GiB HDD), Container Registry.
+- `k8s/` — plain manifests with `__REGISTRY__` / `__TAG__` placeholders; `scripts/deploy.sh`
+  renders them into `.rendered/` (gitignored) and applies.
+- `scripts/` — `lib.sh` (shared helpers) + one script per lifecycle step; `Makefile` is the entry point.
+- Secrets: `.secrets.env` (gitignored) → Kubernetes Secret `recipehub-secrets`. `docs/openapi.yaml`
+  goes into ConfigMap `openapi-spec` and is mounted into the gateway via `OPENAPI_PATH`.
+- Public entry point is `Service type=LoadBalancer` for `api-gateway` — the cloud controller creates
+  the NLB. **Deleting the namespace is what removes the NLB**; `down.sh` waits for that before
+  `terraform destroy`, otherwise the destroy fails on leftover resources.
+- The registry cannot be deleted while it has images — `down.sh` deletes them first.
+- Quotas: a fresh account has 20 GiB HDD / 10 GiB SSD per zone, while a node group needs a 64 GiB
+  boot disk. Request an increase (`yc quota-manager quota-request create`, usually approved at once).
+- Do **not** add a Terraform `apply` step to CI without an explicit human confirmation — an
+  accidentally created cluster costs money every hour.
 
 ## CI
 

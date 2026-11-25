@@ -4,8 +4,9 @@ Recipe-sharing + culinary-blogs service (ITMO «Бэкенд-разработк�
 monorepo; no root `package.json` — each service and `tests/` are independent npm projects.
 
 **Current phase:** the app itself (auth, recipes, steps, comments, ratings, saved recipes,
-subscriptions, feed) is feature-complete and runs in production on a VPS. New work is
-about operations/infrastructure — CI/CD, Ansible, monitoring — not new product features.
+subscriptions, feed) is feature-complete. Section 3 (VPS deploy, Ansible, monitoring) is done;
+**the VPS has been deleted** after the defence. Section 4 is now the active work: a disposable
+Managed Kubernetes stand in Yandex Cloud (`deploy/cloud/`), plus cloud CI/CD and docs.
 Product scope and architecture diagram: `README.md`.
 
 ## Services
@@ -17,8 +18,8 @@ Product scope and architecture diagram: `README.md`.
 | recipe | `services/recipe` | 3002 | ESM | recipes, steps, comments, ratings, saved recipes |
 
 Postgres per DB (`user-db` 5433, `recipe-db` 5434) + RabbitMQ (5672, UI 15672) — see
-`docker-compose.yml`. Infra lives in `deploy/`, E2E tests in `tests/`, API spec in
-`docs/openapi.yaml`, CI in `.github/workflows/deploy.yml`.
+`docker-compose.yml`. Infra lives in `deploy/` (VPS/Ansible) and `deploy/cloud/` (Yandex Cloud),
+E2E tests in `tests/`, API spec in `docs/openapi.yaml`.
 
 ## Commands
 
@@ -36,11 +37,15 @@ Run from repo root unless noted.
   `--tags nginx|docker|firewall|common|app`, `--skip-tags swap`. Needs `SSH_HOST`/`SSH_USER` env
   when run from a laptop; on the host itself add `-i localhost, -c local`.
 
-## Production & auto-deploy — read before pushing
+## Cloud stand & auto-deploy — read before pushing
 
-- **Any push/merge to `main` deploys to the live VPS**: `.github/workflows/deploy.yml` → SSH →
-  `ansible-playbook deploy/ansible/deploy.yml` (role `app`: `git pull` → rebuild → health check).
-  Don't push or merge to `main` unless the user explicitly asks; work on a branch.
+- **There is no live VPS any more.** `.github/workflows/deploy.yml` was renamed to
+  `.github/workflows/deploy-vps.yml.disabled` on `feature/cloud`: it pointed at a deleted server
+  and must not be re-enabled without a real host and fresh secrets.
+- **The cloud stand is disposable and costs money per hour.** Everything lives in `deploy/cloud/`:
+  `make up` → `make build` → `make deploy` → `make down`. Never leave it running unattended and
+  never run `terraform apply` on a push — infra changes are manual and confirmed.
+- Don't push or merge to `main` unless the user explicitly asks; work on a branch.
 - CI runs **no tests** — run `cd tests && npm test` locally before proposing a push.
 - Prod stack is `docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml` (ports
   bound to `127.0.0.1`, only nginx is public). Never `down -v` there — it deletes volumes.

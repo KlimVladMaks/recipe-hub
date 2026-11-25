@@ -93,6 +93,42 @@ RabbitMQ и bootstrap-админа. Файл переиспользуется м
 с тегом `git short sha` (+ `-dirty`, если рабочее дерево грязное). Приложение
 не хранит данные между сессиями, поэтому пересборка при каждом запуске — норма.
 
+## Квоты, которые пришлось поднять
+
+Новый аккаунт Yandex Cloud приходит с очень скромными квотами на диски, и
+группа узлов Managed Kubernetes требует минимум 64 ГБ на загрузочный диск:
+
+| Квота | Было | Стало |
+|---|---:|---:|
+| `compute.hddDisks.size.ru-central1-a` | 20 ГиБ | 100 ГиБ |
+| `compute.ssdDisks.size.ru-central1-a` | 10 ГиБ | 20 ГиБ |
+
+Запросы создаются через CLI и обычно одобряются сразу:
+
+```bash
+yc quota-manager quota-request create \
+  --resource-type resource-manager.cloud \
+  --resource-id <cloud-id> \
+  --desired-limit quota-id=compute.hddDisks.size.ru-central1-a,value=107374182400
+```
+
+Проверить лимиты:
+
+```bash
+yc quota-manager quota-limit list --service compute \
+  --resource-type resource-manager.cloud --resource-id <cloud-id>
+```
+
+## Что уже проверено
+
+- Кластер Managed Kubernetes 1.35 (зональный мастер, Calico) — `HEALTHY`.
+- Один прерываемый узел 2 vCPU / 4 ГБ, диск 64 ГБ HDD.
+- Все сервисы, PostgreSQL и RabbitMQ запущены в namespace `recipehub`.
+- Публичный IP выдаётся `Service type=LoadBalancer` (сетевой балансировщик
+  создаёт контроллер облака).
+- `make smoke` — health всех сервисов и Swagger UI.
+- `make test` — 52 E2E-теста, все проходят против облака.
+
 ## Правила безопасности и экономии
 
 1. **Не пушить в `main` до отдельного решения.** Работаем в `feature/cloud`.

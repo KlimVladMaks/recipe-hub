@@ -21,8 +21,23 @@ else
     sleep 5
   done
 
+  # Реестр нельзя удалить, пока в нём есть образы, поэтому чистим их заранее.
+  registry="$(tf_out registry_id 2>/dev/null || true)"
+  if [ -n "$registry" ]; then
+    log "удаляю образы из реестра $registry"
+    for image in $(yc container image list --registry-id "$registry" --format json 2>/dev/null \
+      | python3 -c 'import json,sys; print(" ".join(i["id"] for i in json.load(sys.stdin)))' 2>/dev/null); do
+      yc container image delete --id "$image" >/dev/null 2>&1 || warn "не удалось удалить образ $image"
+    done
+  fi
+
   log "terraform destroy"
-  tf destroy -auto-approve -input=false
+  # У API иногда бывают кратковременные Internal-ошибки при удалении
+  # кластера; повторный запуск destroy продолжает с того же места.
+  if ! tf destroy -auto-approve -input=false; then
+    warn "destroy завершился с ошибкой, пробую ещё раз"
+    tf destroy -auto-approve -input=false
+  fi
 fi
 
 rm -f "$CLOUD_DIR/.url"
