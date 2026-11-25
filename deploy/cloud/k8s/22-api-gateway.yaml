@@ -1,0 +1,92 @@
+# Единственная публичная точка входа.
+#
+# Service type=LoadBalancer заставляет контроллер облака создать сетевой
+# балансировщик с публичным IP. Отдельный ingress-контроллер для учебного
+# стенда не нужен: шлюз сам обслуживает /api и /api-docs.
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: recipehub
+  labels:
+    app: api-gateway
+spec:
+  type: LoadBalancer
+  selector:
+    app: api-gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: recipehub
+  labels:
+    app: api-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: __REGISTRY__/recipehub-api-gateway:__TAG__
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: PORT
+              value: "3000"
+            - name: USER_SERVICE_URL
+              value: http://user-service:3001
+            - name: RECIPE_SERVICE_URL
+              value: http://recipe-service:3002
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: recipehub-secrets
+                  key: JWT_SECRET
+            - name: X_USER_ID
+              value: x-user-id
+            - name: X_USER_ROLE
+              value: x-user-role
+            # Спецификация OpenAPI монтируется из ConfigMap: в образ шлюза
+            # попадает только код сервиса, а docs/openapi.yaml лежит в корне
+            # репозитория (как и в docker-compose).
+            - name: OPENAPI_PATH
+              value: /app/openapi/openapi.yaml
+          volumeMounts:
+            - name: openapi
+              mountPath: /app/openapi
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /api/api-gateway-health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/api-gateway-health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 20
+      volumes:
+        - name: openapi
+          configMap:
+            name: openapi-spec

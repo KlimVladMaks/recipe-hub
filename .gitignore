@@ -17,3 +17,6 @@ deploy/cloud/terraform/*.tfstate.*
 deploy/cloud/terraform/terraform.tfvars
 deploy/cloud/terraform/tfplan
 site/
+deploy/cloud/.rendered/
+deploy/cloud/.last-tag
+deploy/cloud/.url

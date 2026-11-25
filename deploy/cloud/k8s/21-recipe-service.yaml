@@ -1,0 +1,96 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: recipe-service
+  namespace: recipehub
+  labels:
+    app: recipe-service
+spec:
+  selector:
+    app: recipe-service
+  ports:
+    - name: http
+      port: 3002
+      targetPort: 3002
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recipe-service
+  namespace: recipehub
+  labels:
+    app: recipe-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: recipe-service
+  template:
+    metadata:
+      labels:
+        app: recipe-service
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: busybox:1.37
+          command:
+            - sh
+            - -c
+            - until nc -z recipe-db 5432; do echo "waiting for recipe-db"; sleep 2; done
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+      containers:
+        - name: recipe-service
+          image: __REGISTRY__/recipehub-recipe:__TAG__
+          ports:
+            - name: http
+              containerPort: 3002
+          env:
+            - name: PORT
+              value: "3002"
+            - name: RECIPE_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: recipehub-secrets
+                  key: RECIPE_DB_PASSWORD
+            - name: DATABASE_URL
+              value: "postgresql://user:$(RECIPE_DB_PASSWORD)@recipe-db:5432/recipe_db"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: recipehub-secrets
+                  key: JWT_SECRET
+            - name: X_USER_ID
+              value: x-user-id
+            - name: X_USER_ROLE
+              value: x-user-role
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: recipehub-secrets
+                  key: RABBITMQ_PASSWORD
+            - name: RABBITMQ_URL
+              value: "amqp://recipehub:$(RABBITMQ_PASSWORD)@rabbitmq:5672"
+            - name: USER_SERVICE_URL
+              value: http://user-service:3001
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 384Mi
+          readinessProbe:
+            httpGet:
+              path: /api/recipe-service-health
+              port: 3002
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/recipe-service-health
+              port: 3002
+            initialDelaySeconds: 60
+            periodSeconds: 20
