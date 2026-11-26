@@ -1,0 +1,19 @@
+# Конфигурация линтера OpenAPI-спецификации.
+#
+# Локально: npx @redocly/cli@1.34.24 lint docs/openapi.yaml
+# В CI:     job «openapi» в .github/workflows/ci.yml
+#
+# Спецификация — docs/openapi.yaml, она же отдаётся Swagger UI по /api-docs.
+
+extends:
+  - recommended
+
+rules:
+  # Ошибки 400/401/403/404/409 описаны один раз в components.responses и
+  # используются там, где они реально возможны. У списков и «состояний»
+  # (например, GET /recipes/{id}/save) 4xx нет: они отвечают 200 с пустым
+  # результатом, поэтому требовать 4xx в каждой операции избыточно.
+  operation-4xx-response: off
+
+  # Учебный проект без лицензии — не требуем info.license.
+  info-license: off

@@ -25,7 +25,21 @@ export const docsRouter = Router();
 const spec = loadSpec();
 
 if (spec) {
-    docsRouter.use('/api-docs', swaggerUi.serve, swaggerUi.setup(spec));
+    docsRouter.use(
+        '/api-docs',
+        swaggerUi.serve,
+        swaggerUi.setup(spec, {
+            customSiteTitle: 'RecipeHub API — Swagger UI',
+            swaggerOptions: {
+                // JWT остаётся введённым между запросами — удобно проверять API вручную.
+                persistAuthorization: true,
+                displayRequestDuration: true,
+                tryItOutEnabled: true,
+                filter: true,
+                defaultModelsExpandDepth: 1,
+            },
+        })
+    );
     docsRouter.get('/openapi.json', (_req, res) => {
         res.status(200).json(spec);
     });

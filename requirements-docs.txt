@@ -1,0 +1,6 @@
+# Зависимости сайта документации (MkDocs + Material).
+# Версии зафиксированы, чтобы локальная сборка и GitHub Actions совпадали.
+mkdocs==1.6.1
+mkdocs-material==9.8.2
+pymdown-extensions==13.1.2
+Markdown==3.11.4

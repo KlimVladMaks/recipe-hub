@@ -11,6 +11,13 @@ Product scope and architecture diagram: `README.md`. The section-4 technical des
 `docs/cloud/technical-design.md` — when you change infrastructure, update it too (it has a
 "соответствие реализации" table that maps every design claim to a file).
 
+Documentation (ДЗ9) is a MkDocs site built from `docs/` and published to GitHub Pages:
+<https://klimvladmaks.github.io/recipe-hub/> (`mkdocs.yml`, `requirements-docs.txt`,
+`.github/workflows/docs.yml`). The API is documented by `docs/openapi.yaml` (Swagger UI at
+`/api-docs`, linted with Redocly in CI) and by the Postman collection in `tests/postman/`
+(environments `local`/`cloud`). When you add or change an endpoint, update the spec and the
+collection; `mkdocs build --strict` must stay green.
+
 ## Services
 
 | Service | Dir | Port | Module | Purpose |
@@ -34,6 +41,10 @@ Run from repo root unless noted.
 - Prisma: `npm run prisma:generate`, `npm run prisma:migrate` (`migrate deploy`). `DATABASE_URL` uses
   docker hostnames, so run these inside a container, not on the host.
 - Swagger UI: <http://localhost:3000/api-docs>; raw spec at `/openapi.json`.
+- OpenAPI lint: `npx @redocly/cli@2.84.0 lint docs/openapi.yaml` (config in `redocly.yaml`).
+- Docs site: `python3 -m venv .venv-docs && .venv-docs/bin/pip install -r requirements-docs.txt`,
+  then `.venv-docs/bin/mkdocs serve` (<http://127.0.0.1:8000/recipe-hub/>) or
+  `.venv-docs/bin/mkdocs build --strict`. The site lives in `docs/`, nav in `mkdocs.yml`.
 - Ansible (server config + deploy): `cd deploy/ansible` first, then `ansible-playbook site.yml`
   (full host setup), `ansible-playbook deploy.yml` (update + rebuild), `--check --diff` to preview,
   `--tags nginx|docker|firewall|common|app`, `--skip-tags swap`. Needs `SSH_HOST`/`SSH_USER` env
@@ -48,9 +59,11 @@ Run from repo root unless noted.
   `make up` → `make build` → `make deploy` → `make down`. Never leave it running unattended and
   never run `terraform apply` on a push — infra changes are manual and confirmed.
 - Don't push or merge to `main` unless the user explicitly asks; work on a branch.
-- CI (`.github/workflows/ci.yml`) runs typecheck + the full E2E/Newman suite on docker compose for
-  every push and PR — it uses no cloud and costs nothing. Cloud delivery is manual only:
-  `deploy-cloud.yml` (app) and `infra.yml` (Terraform), both gated by the `cloud-stand` Environment.
+- CI (`.github/workflows/ci.yml`) runs typecheck, `redocly lint docs/openapi.yaml` and the full
+  E2E/Newman suite on docker compose for every push and PR — it uses no cloud and costs nothing.
+  `.github/workflows/docs.yml` builds MkDocs with `--strict` on PRs and publishes to GitHub Pages
+  from `main`. Cloud delivery is manual only: `deploy-cloud.yml` (app) and `infra.yml` (Terraform),
+  both gated by the `cloud-stand` Environment.
 - Prod stack is `docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml` (ports
   bound to `127.0.0.1`, only nginx is public). Never `down -v` there — it deletes volumes.
 - The VPS is small (2 vCPU / 2 GB + swap), a rebuild takes minutes, deploys are serialized

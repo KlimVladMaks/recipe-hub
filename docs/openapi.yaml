@@ -1369,6 +1369,8 @@ components:
                 type: string
               message:
                 type: string
+      example:
+        error: Рецепт не найден
 
     PaginationMeta:
       type: object
@@ -1398,6 +1400,12 @@ components:
         about:
           type: string
           nullable: true
+      example:
+        username: chef_anna
+        password: Secret123!
+        firstName: Анна
+        lastName: Петрова
+        about: Люблю выпечку и кулинарные эксперименты
 
     LoginRequest:
       type: object
@@ -1407,6 +1415,9 @@ components:
           type: string
         password:
           type: string
+      example:
+        username: admin
+        password: admin123
 
     LoginResponse:
       type: object
@@ -1516,8 +1527,8 @@ components:
         media:
           $ref: '#/components/schemas/RecipeMediaReadList'
         difficulty:
-          allOf:
-            - $ref: '#/components/schemas/Difficulty'
+          type: string
+          enum: [easy, medium, hard]
           nullable: true
         createdAt:
           type: string
@@ -1566,6 +1577,17 @@ components:
           $ref: '#/components/schemas/Difficulty'
         isPublished:
           type: boolean
+      example:
+        title: Борщ с пампушками
+        dishTypeIds: [1, 2]
+        ingredientIds: [1, 5, 9]
+        description: Классический украинский борщ с говядиной
+        difficulty: medium
+        isPublished: true
+        media:
+          - sortOrder: 1
+            mediaType: photo
+            mediaUrl: https://example.com/borscht.jpg
 
     RecipeUpdate:
       type: object
@@ -1896,6 +1918,8 @@ components:
       properties:
         text:
           type: string
+      example:
+        text: Очень вкусно, спасибо за рецепт!
 
     CommentUpdate:
       type: object
@@ -1903,6 +1927,8 @@ components:
       properties:
         text:
           type: string
+      example:
+        text: Обновил комментарий после второй готовки
 
     IsCommentLikedRead:
       type: object

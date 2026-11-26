@@ -70,6 +70,26 @@ jobs:
         working-directory: ${{ matrix.dir }}
         run: npm run typecheck
 
+  # Спецификация — единственный источник правды для Swagger UI и Postman,
+  # поэтому её синтаксис и ссылки проверяются на каждом push.
+  openapi:
+    name: OpenAPI lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Redocly CLI 2.x требует Node >= 20.19, поэтому здесь отдельная версия:
+      # остальные джобы остаются на 20 ради совместимости с образами сервисов.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Lint docs/openapi.yaml
+        run: npx --yes @redocly/cli@2.84.0 lint docs/openapi.yaml
+
   e2e:
     name: E2E (docker compose)
     runs-on: ubuntu-latest
