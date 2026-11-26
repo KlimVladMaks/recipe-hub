@@ -1,5 +1,7 @@
 # RecipeHub
 
+[![CI](https://github.com/KlimVladMaks/recipe-hub/actions/workflows/ci.yml/badge.svg?branch=feature/cloud)](https://github.com/KlimVladMaks/recipe-hub/actions/workflows/ci.yml)
+
 Сервис для обмена рецептами и кулинарных блогов. Учебный проект (ИТМО, «Бэкенд-разработка»),
 реализованный как набор микросервисов на Node.js + TypeScript.
 
@@ -106,6 +108,20 @@ Yandex Managed Service for Kubernetes. Он поднимается через Te
 облачные ресурсы, сетевая связность, отказоустойчивость, безопасность,
 стоимость и production-вариант — в
 [`docs/cloud/technical-design.md`](docs/cloud/technical-design.md).
+
+## CI/CD
+
+- **CI** (`.github/workflows/ci.yml`) — на каждый push и PR: проверка типов всех
+  сервисов, сборка docker compose, 52 E2E-теста и коллекция Postman. Облако не
+  используется, прогон бесплатный.
+- **CD** (`deploy-cloud.yml`) — только вручную: сборка и пуш образов в Container
+  Registry, деплой в Kubernetes, smoke и E2E против облачного стенда.
+- **Инфраструктура** (`infra.yml`) — только вручную: `terraform plan`, затем
+  `apply` или `destroy` после подтверждения.
+
+Деплой и Terraform требуют подтверждения в GitHub Environment `cloud-stand`,
+поэтому push в ветку не может создать платный кластер. Подробности и команды —
+в [`deploy/cloud/README.md`](deploy/cloud/README.md#cicd-дз8).
 
 > VPS из ЛР4/ЛР5/ЛР6 удалён после защиты. Старый workflow автодеплоя на VPS
 > отключён (`.github/workflows/deploy-vps.yml.disabled`); не включайте его без

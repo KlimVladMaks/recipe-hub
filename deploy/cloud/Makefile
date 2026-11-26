@@ -1,5 +1,6 @@
 # Жизненный цикл облачного стенда RecipeHub (Yandex Cloud).
 #
+#   make init-state — одноразово: SA для CI, бакет для state, backend.hcl
 #   make up      — создать инфраструктуру (~10–20 мин, с этого момента платно)
 #   make build   — собрать и запушить образы
 #   make deploy  — выкатить приложение в кластер
@@ -13,10 +14,13 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help up build deploy smoke test pause resume down status url logs
+.PHONY: help init-state up build deploy smoke test pause resume down status url logs
 
 help:
 	@grep -E '^#   ' Makefile | sed 's/^#   //'
+
+init-state:
+	./scripts/init-state.sh
 
 up:
 	./scripts/up.sh

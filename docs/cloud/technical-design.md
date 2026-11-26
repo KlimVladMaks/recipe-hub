@@ -741,78 +741,131 @@ DR-план стенда — это не «восстановление из б�
 
 ## 9. CI/CD
 
-### 9.1 Текущее состояние
+### 9.1 Обзор
 
-Жизненный цикл выполняется локально из `deploy/cloud`:
-
-```text
-make up      → terraform init/apply, kubeconfig, ожидание Ready узлов
-make build   → docker build ×3, docker login cr.yandex, docker push
-make deploy  → Secret + ConfigMap, рендер манифестов, kubectl apply, rollout status
-make smoke   → health всех сервисов, Swagger UI
-make test    → smoke + 52 E2E-теста
-make down    → удаление namespace (NLB, PVC), образов, terraform destroy
-```
-
-Так сделано намеренно: на этом этапе важно было отладить инфраструктуру и
-манифесты, а не автоматизировать их запуск. Плюс ручного контура — невозможно
-случайно создать платный кластер из push в ветку.
-
-### 9.2 Целевой пайплайн (ДЗ8)
+Пайплайн разделён на три независимых workflow: дешёвая проверка на каждый
+коммит, доставка в облако и управление инфраструктурой. Разделение — следствие
+главного ограничения: **облако стоит денег, а CI — нет**.
 
 ```mermaid
-flowchart LR
-    subgraph ci["CI · на каждый push"]
-        direction TB
-        push["push в feature/cloud"] --> build["build: docker build ×3<br/>typecheck + prisma generate"]
-        build --> e2e["E2E на docker compose"]
+flowchart TB
+    subgraph ci["CI · push / PR · бесплатно"]
+        direction LR
+        c1["typecheck<br/>3 сервиса + tests"] --> c2["docker compose<br/>up --build"]
+        c2 --> c3["52 E2E + Newman"]
     end
-    subgraph cd["CD · после зелёного CI"]
-        direction TB
-        registry["push в Container Registry<br/>тег = git SHA"] --> deploy["deploy: kubectl apply<br/>роль в кластере"]
-        deploy --> smoke["smoke + Newman<br/>отчёт в артефакте"]
+    subgraph cd["CD · только вручную · Environment cloud-stand"]
+        direction LR
+        d1["build + push<br/>тег = git SHA"] --> d2["kubectl apply<br/>rollout status"]
+        d2 --> d3["smoke + E2E<br/>против облака"]
     end
-    e2e --> registry
+    subgraph infra["Инфраструктура · только вручную"]
+        direction LR
+        i1["terraform plan"] --> i2["apply / destroy<br/>после подтверждения"]
+    end
+    ci -.->|"зелёный прогон"| cd
+    infra -.->|"кластер готов"| cd
 ```
 
-Требования к пайплайну, вытекающие из этого дизайна:
+| Workflow | Триггер | Стоимость | Ответственность |
+|---|---|---|---|
+| `ci.yml` | `push` в любую ветку, `pull_request`, вручную | 0 ₽ | сборка, типы, E2E, Postman |
+| `deploy-cloud.yml` | только `workflow_dispatch` | ~10 ₽/час работы стенда | доставка приложения |
+| `infra.yml` | только `workflow_dispatch` | создаёт/удаляет платное | Terraform |
 
-- **Деплой только из CI**, тег образа = SHA коммита, чтобы откат был
-  `kubectl rollout undo` или повторный деплой предыдущего тега.
-- **Тесты до деплоя**, а не после: E2E на `docker compose` дешевле и быстрее, чем
-  прогон против облака, а облако нужно только для проверки «оно там работает».
-- **Аутентификация** — сервисный аккаунт с ключом в GitHub Secrets (или workload
-  identity federation, если она доступна в каталоге); IAM-токен живёт 12 часов,
-  для пайплайна достаточно.
-- **Смоук после деплоя** — health + Swagger + ключевой сценарий (регистрация,
-  создание рецепта, лента).
+### 9.2 CI: проверка на каждый коммит
 
-### 9.3 Контур Terraform
+`ci.yml` не обращается к облаку: тесты идут против локального
+`docker compose`, поэтому прогон ничего не стоит и не зависит от того, поднят
+ли стенд.
 
-Инфраструктура не должна меняться по push. Отдельный workflow:
+- **Typecheck** — матрица из четырёх проектов (`api-gateway`, `user`, `recipe`,
+  `tests`): `npm ci`, `prisma generate` там, где есть схема, `tsc --noEmit`.
+  Разные проекты проверяются параллельно, падение одного не скрывает остальные.
+- **E2E** — генерация `.env` из `.env.example` с общим `JWT_SECRET`
+  (проверяется, что значение действительно одно на все три сервиса),
+  `docker compose up -d --build`, ожидание health-эндпоинта шлюза, 52 E2E-теста,
+  коллекция Postman через Newman.
+- **Артефакты** — логи тестов и Newman (7 дней), логи контейнеров при падении.
+- `concurrency` с `cancel-in-progress`: новый пуш в ту же ветку отменяет
+  устаревший прогон.
 
-| Триггер | Действие |
+### 9.3 CD: доставка в облако
+
+`deploy-cloud.yml` запускается только вручную и только после подтверждения в
+GitHub Environment `cloud-stand`. Шаги:
+
+1. Установка `yc` и `kubectl`, аутентификация сервисным аккаунтом.
+2. Поиск кластера и реестра по имени через `yc` (state в этом workflow не нужен —
+   инфраструктурой управляет `infra.yml`).
+3. Сборка трёх образов и пуш в Container Registry с тегом `git short SHA`.
+4. `kubectl create secret/configmap --dry-run | kubectl apply` — идемпотентно;
+   секреты приходят из GitHub Secrets, спецификация OpenAPI — из `docs/`.
+5. Рендер манифестов (`scripts/render.sh`) и `kubectl apply`.
+6. `rollout status` для каждого компонента, ожидание публичного IP балансировщика.
+7. Smoke (health всех сервисов + Swagger UI) и E2E-тесты против облака.
+
+Вход `action` позволяет не пересобирать стенд ради проверки:
+
+| `action` | Что делает |
 |---|---|
-| `workflow_dispatch` с параметром `action=plan` | `terraform plan`, план в артефакт и в summary |
-| `workflow_dispatch` с `action=apply` | только после подтверждения через GitHub Environment с required reviewer |
-| `workflow_dispatch` с `action=destroy` | подтверждение, удаление стенда |
-| push | ничего |
+| `deploy` | полный цикл: сборка, пуш, деплой, smoke, E2E |
+| `smoke` | только проверка уже развёрнутого стенда |
+| `destroy-namespace` | удаляет namespace (вместе с NLB и PVC), кластер остаётся |
 
-Это прямое следствие цены ошибки: забытый кластер — это ~7 200 ₽/мес, то есть
-грант целиком за две недели.
+### 9.4 Инфраструктура
 
-### 9.4 Секреты в CI
+`infra.yml` управляет Terraform. Job `plan` выполняется без подтверждения
+(он ничего не создаёт) и сохраняет план артефактом; job `apply` требует
+approval в `cloud-stand` и применяет **ровно тот план**, который был показан.
+
+| `action` | Поведение |
+|---|---|
+| `plan` | `fmt -check`, `validate`, `plan`, план в артефакт и summary |
+| `apply` | тот же план применяется после подтверждения |
+| `destroy` | дополнительно требуется `confirm=destroy`; перед удалением чистятся NLB, PVC и образы в реестре |
+
+**Remote state.** Раннер одноразовый: если state лежит только на нём, следующий
+запуск не увидит созданные ресурсы, и `destroy` не сработает. Поэтому state
+хранится в Object Storage (`backend.tf` + `backend.hcl`), создаётся скриптом
+`scripts/init-state.sh`. Это же позволяет чередовать локальные `make up` и
+запуски из CI без расхождений.
+
+**Порядок удаления.** Terraform не знает о NLB и PVC — они появляются из
+Kubernetes-манифестов, а реестр нельзя удалить, пока в нём есть образы. Поэтому
+`destroy` сначала удаляет namespace (вместе с ним балансировщик и диски), ждёт
+исчезновения NLB, чистит реестр и только затем применяет destroy-план. После
+этого workflow проверяет остатки: кластеры, балансировщики, адреса, диски,
+реестры — и пишет результат в summary.
+
+### 9.5 Секреты и доступы
 
 | Секрет | Назначение |
 |---|---|
-| `YC_SA_KEY` | JSON-ключ сервисного аккаунта для `yc` и `terraform` |
+| `YC_SA_KEY_JSON` | авторизованный ключ сервисного аккаунта `recipehub-ci` |
 | `YC_CLOUD_ID`, `YC_FOLDER_ID` | параметры каталога |
-| `KUBE_CONFIG` | доступ к кластеру для деплоя (или генерация через `yc`) |
-| `JWT_SECRET`, `*_DB_PASSWORD`, `RABBITMQ_PASSWORD`, `ADMIN_PASSWORD` | значения для Kubernetes Secret |
+| `TF_STATE_ACCESS_KEY`, `TF_STATE_SECRET_KEY` | статический ключ для S3-бэкенда |
+| `APP_JWT_SECRET`, `APP_*_DB_PASSWORD`, `APP_RABBITMQ_PASSWORD`, `APP_ADMIN_PASSWORD` | значения для Kubernetes Secret |
+| переменная `TF_STATE_BUCKET` | имя бакета с state (не секрет) |
 
-Правило: значения секретов не печатаются в логах, `terraform plan` не содержит
-паролей (они передаются в кластер через `kubectl create secret`, а не через
-Terraform).
+Сервисный аккаунт `recipehub-ci` получает роли на каталог: `admin` (нужна
+Terraform'у, чтобы создавать сеть, кластер и сервисные аккаунты),
+`k8s.cluster-api.cluster-admin` (kubectl), `storage.admin` (state), плюс
+`container-registry.images.pusher`. Пользовательские OAuth-токены в CI не
+хранятся — только ключ сервисного аккаунта, который можно отозвать.
+
+### 9.6 Компромиссы
+
+- **Нет автодеплоя на push.** Сознательно: забытый кластер стоит ~7 200 ₽/мес,
+  то есть весь грант за две недели. Ручной запуск с подтверждением — дешевле,
+  чем один инцидент.
+- **Нет кэша Docker-слоёв между прогонами.** Сборка трёх образов занимает
+  несколько минут; для трёх-четырёх прогонов в неделю это дешевле, чем
+  поддерживать registry cache.
+- **Только один стенд.** `concurrency: cloud-stand` не даёт двум операциям
+  выполняться одновременно: иначе `apply` и `destroy` подрались бы за state.
+- **Тег — короткий SHA**, без `latest`: по работающему поду всегда виден коммит,
+  откат — повторный деплой предыдущего тега.
 
 ---
 

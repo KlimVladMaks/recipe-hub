@@ -98,11 +98,24 @@ Disposable Managed Kubernetes stand in Yandex Cloud. Lifecycle is
 
 ## CI
 
-`.github/workflows/deploy.yml`: `push` to `main` + `workflow_dispatch`, serialized by
-`concurrency: deploy-production` (no cancel), checks out the repo, installs `ansible-core` in a
-venv + `community.general`, runs `deploy.yml` over SSH (`SSH_HOST` / `SSH_USER` / `SSH_KEY` from
-secrets), then a smoke test through nginx. **No test job** — if you add one, it should run before
-the deploy step, not as a separate workflow, because the deploy mutates production anyway.
+Three workflows in `.github/workflows/`:
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `ci.yml` | every push/PR | typecheck matrix (3 services + tests), `docker compose up -d --build`, 52 E2E tests, Newman collection; no cloud |
+| `deploy-cloud.yml` | `workflow_dispatch` only | build/push three images to Container Registry, apply manifests, smoke, E2E against the stand |
+| `infra.yml` | `workflow_dispatch` only | `terraform fmt/validate/plan`, then `apply` or `destroy` of the saved plan |
+
+- `deploy-cloud.yml` and `infra.yml` run in the `cloud-stand` GitHub Environment with a **required
+  reviewer** — a run waits for manual approval before doing anything that costs money.
+- Terraform state is remote (Object Storage bucket, configured by `scripts/init-state.sh`); the
+  runner is ephemeral, so a local state would be lost and `destroy` would not see the resources.
+- Both workflows use composite actions `.github/actions/yc-setup` (yc + kubectl + SA key) and
+  `.github/actions/tf-setup` (terraform + backend + init). Auth is a service-account JSON key in
+  GitHub Secrets; there are no long-lived user OAuth tokens in CI.
+- `deploy-cloud.yml` takes `action=deploy|smoke|destroy-namespace`; `destroy-namespace` removes the
+  NLB/PVC but keeps the cluster. Full teardown is `infra.yml action=destroy confirm=destroy`.
+- Do not add a `push` trigger to the cloud workflows: a forgotten cluster costs the whole grant.
 
 ## Rules
 
