@@ -4,9 +4,12 @@ Recipe-sharing + culinary-blogs service (ITMO «Бэкенд-разработк�
 monorepo; no root `package.json` — each service and `tests/` are independent npm projects.
 
 **Current phase:** the app itself (auth, recipes, steps, comments, ratings, saved recipes,
-subscriptions, feed) is feature-complete and runs in production on a VPS. New work is
-about operations/infrastructure — CI/CD, Ansible, monitoring — not new product features.
-Product scope and architecture diagram: `README.md`.
+subscriptions, feed) is feature-complete. Section 3 (VPS deploy, Ansible, monitoring) is done;
+**the VPS has been deleted** after the defence. Section 4 is now the active work: a disposable
+Managed Kubernetes stand in Yandex Cloud (`deploy/cloud/`), plus cloud CI/CD and docs.
+Product scope and architecture diagram: `README.md`. The section-4 technical design (ДЗ7) is
+`docs/cloud/technical-design.md` — when you change infrastructure, update it too (it has a
+"соответствие реализации" table that maps every design claim to a file).
 
 ## Services
 
@@ -17,8 +20,8 @@ Product scope and architecture diagram: `README.md`.
 | recipe | `services/recipe` | 3002 | ESM | recipes, steps, comments, ratings, saved recipes |
 
 Postgres per DB (`user-db` 5433, `recipe-db` 5434) + RabbitMQ (5672, UI 15672) — see
-`docker-compose.yml`. Infra lives in `deploy/`, E2E tests in `tests/`, API spec in
-`docs/openapi.yaml`, CI in `.github/workflows/deploy.yml`.
+`docker-compose.yml`. Infra lives in `deploy/` (VPS/Ansible) and `deploy/cloud/` (Yandex Cloud),
+E2E tests in `tests/`, API spec in `docs/openapi.yaml`.
 
 ## Commands
 
@@ -36,20 +39,27 @@ Run from repo root unless noted.
   `--tags nginx|docker|firewall|common|app`, `--skip-tags swap`. Needs `SSH_HOST`/`SSH_USER` env
   when run from a laptop; on the host itself add `-i localhost, -c local`.
 
-## Production & auto-deploy — read before pushing
+## Cloud stand & auto-deploy — read before pushing
 
-- **Any push/merge to `main` deploys to the live VPS**: `.github/workflows/deploy.yml` → SSH →
-  `ansible-playbook deploy/ansible/deploy.yml` (role `app`: `git pull` → rebuild → health check).
-  Don't push or merge to `main` unless the user explicitly asks; work on a branch.
-- CI runs **no tests** — run `cd tests && npm test` locally before proposing a push.
+- **There is no live VPS any more.** `.github/workflows/deploy.yml` was renamed to
+  `.github/workflows/deploy-vps.yml.disabled` on `feature/cloud`: it pointed at a deleted server
+  and must not be re-enabled without a real host and fresh secrets.
+- **The cloud stand is disposable and costs money per hour.** Everything lives in `deploy/cloud/`:
+  `make up` → `make build` → `make deploy` → `make down`. Never leave it running unattended and
+  never run `terraform apply` on a push — infra changes are manual and confirmed.
+- Don't push or merge to `main` unless the user explicitly asks; work on a branch.
+- CI (`.github/workflows/ci.yml`) runs typecheck + the full E2E/Newman suite on docker compose for
+  every push and PR — it uses no cloud and costs nothing. Cloud delivery is manual only:
+  `deploy-cloud.yml` (app) and `infra.yml` (Terraform), both gated by the `cloud-stand` Environment.
 - Prod stack is `docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml` (ports
   bound to `127.0.0.1`, only nginx is public). Never `down -v` there — it deletes volumes.
 - The VPS is small (2 vCPU / 2 GB + swap), a rebuild takes minutes, deploys are serialized
   (`concurrency: deploy-production`).
 - Secrets: `services/*/.env` are gitignored and generated from `.env.example` **only at first
   setup** — editing `.env.example` does not update the server. `JWT_SECRET` must be identical in
-  all three services. GitHub secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`; app dir on the
-  server is `/opt/recipe-hub` (root).
+  all three services. GitHub side (cloud stand): `YC_SA_KEY_JSON`, `YC_CLOUD_ID`, `YC_FOLDER_ID`,
+  `TF_STATE_ACCESS_KEY`, `TF_STATE_SECRET_KEY`, `APP_*` app secrets, variable `TF_STATE_BUCKET`;
+  the old `SSH_*` VPS secrets are gone. App dir on the (deleted) VPS was `/opt/recipe-hub`.
 - Don't SSH into the VPS or edit files there unless explicitly asked.
 - Details and rules for infra changes: `deploy/AGENTS.md` + `deploy/README.md`.
 

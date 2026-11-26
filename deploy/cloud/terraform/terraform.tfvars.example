@@ -1,0 +1,6 @@
+# Скопируйте в terraform.tfvars (файл в .gitignore) или передайте через -var.
+# cloud_id / folder_id можно не указывать, если в окружении есть
+# YC_CLOUD_ID и YC_FOLDER_ID (их выставляет `yc init`).
+zone         = "ru-central1-a"
+cluster_name = "recipehub-cloud"
+environment  = "study"

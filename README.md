@@ -1,5 +1,7 @@
 # RecipeHub
 
+[![CI](https://github.com/KlimVladMaks/recipe-hub/actions/workflows/ci.yml/badge.svg?branch=feature/cloud)](https://github.com/KlimVladMaks/recipe-hub/actions/workflows/ci.yml)
+
 Сервис для обмена рецептами и кулинарных блогов. Учебный проект (ИТМО, «Бэкенд-разработка»),
 реализованный как набор микросервисов на Node.js + TypeScript.
 
@@ -93,6 +95,37 @@ ssh -L 3300:127.0.0.1:3300 root@<IP_СЕРВЕРА>
 
 Подробности, схема, секреты, TLS, туннели и команды Ansible — в
 [`deploy/README.md`](deploy/README.md).
+
+## Облачный стенд (Yandex Cloud)
+
+Сейчас основной стенд для раздела 4 дисциплины — одноразовый кластер
+Yandex Managed Service for Kubernetes. Он поднимается через Terraform только
+на время тестов/защиты и удаляется командой `down`, чтобы не платить за
+простой. План, архитектура и правила экономии — в
+[`deploy/cloud/README.md`](deploy/cloud/README.md).
+
+Технический дизайн облачной инфраструктуры (ДЗ7): архитектурные решения,
+облачные ресурсы, сетевая связность, отказоустойчивость, безопасность,
+стоимость и production-вариант — в
+[`docs/cloud/technical-design.md`](docs/cloud/technical-design.md).
+
+## CI/CD
+
+- **CI** (`.github/workflows/ci.yml`) — на каждый push и PR: проверка типов всех
+  сервисов, сборка docker compose, 52 E2E-теста и коллекция Postman. Облако не
+  используется, прогон бесплатный.
+- **CD** (`deploy-cloud.yml`) — только вручную: сборка и пуш образов в Container
+  Registry, деплой в Kubernetes, smoke и E2E против облачного стенда.
+- **Инфраструктура** (`infra.yml`) — только вручную: `terraform plan`, затем
+  `apply` или `destroy` после подтверждения.
+
+Деплой и Terraform требуют подтверждения в GitHub Environment `cloud-stand`,
+поэтому push в ветку не может создать платный кластер. Подробности и команды —
+в [`deploy/cloud/README.md`](deploy/cloud/README.md#cicd-дз8).
+
+> VPS из ЛР4/ЛР5/ЛР6 удалён после защиты. Старый workflow автодеплоя на VPS
+> отключён (`.github/workflows/deploy-vps.yml.disabled`); не включайте его без
+> реального сервера и обновлённых секретов.
 
 ## Запуск сервиса локально
 

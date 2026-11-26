@@ -1,9 +1,16 @@
 # deploy/ — infrastructure & operations (agent notes)
 
-Everything that is not application code: the prod compose override, nginx, setup/deploy scripts
-and, later, Ansible and monitoring. **Put new infrastructure here, not in the repo root.**
-The full runbook (in Russian) is `deploy/README.md`; this file is the agent-facing summary and
-adds the rules that matter when changing infra.
+Everything that is not application code. Two independent stacks live here:
+
+| Path | What it is | Status |
+|---|---|---|
+| `deploy/ansible/`, `deploy/scripts/`, `docker-compose.prod.yml`, `docker-compose.monitoring.yml`, `deploy/monitoring/` | Section 3: VPS deploy, Ansible, monitoring | **archived** — the VPS was deleted after the defence |
+| `deploy/cloud/` | Section 4: disposable Yandex Cloud Managed Kubernetes stand | **active** |
+
+`deploy/README.md` documents the VPS/Ansible stack (kept as history and for the report);
+`deploy/cloud/README.md` documents the cloud stand. This file is the agent-facing summary.
+
+**Put new infrastructure under `deploy/`, never in the repo root.**
 
 ## Topology
 
@@ -64,13 +71,51 @@ otherwise SSH dies), `nginx` (template + `nginx -t` before reload), `app` (git, 
   common,firewall,nginx,docker` inside (`swapon` does not work in a container — use
   `--skip-tags swap`).
 
+## Cloud stand (`deploy/cloud/`)
+
+Disposable Managed Kubernetes stand in Yandex Cloud. Lifecycle is
+`make up` → `make build` → `make deploy` → `make smoke`/`make test` → `make down`
+(run from `deploy/cloud`). It is **paid by the hour** — `make down` is not optional.
+
+- `terraform/` — VPC, subnet, 3 security groups, 2 service accounts + IAM, zonal K8s master
+  (`s-c2-m8`, Calico), one preemptible node (2 vCPU / 50% / 4 GiB, 64 GiB HDD), Container Registry.
+- `k8s/` — plain manifests with `__REGISTRY__` / `__TAG__` placeholders; `scripts/deploy.sh`
+  renders them into `.rendered/` (gitignored) and applies.
+- `scripts/` — `lib.sh` (shared helpers) + one script per lifecycle step; `Makefile` is the entry point.
+- Secrets: `.secrets.env` (gitignored) → Kubernetes Secret `recipehub-secrets`. `docs/openapi.yaml`
+  goes into ConfigMap `openapi-spec` and is mounted into the gateway via `OPENAPI_PATH`.
+- Public entry point is `Service type=LoadBalancer` for `api-gateway` — the cloud controller creates
+  the NLB. **Deleting the namespace is what removes the NLB**; `down.sh` waits for that before
+  `terraform destroy`, otherwise the destroy fails on leftover resources.
+- The registry cannot be deleted while it has images — `down.sh` deletes them first.
+- Quotas: a fresh account has 20 GiB HDD / 10 GiB SSD per zone, while a node group needs a 64 GiB
+  boot disk. Request an increase (`yc quota-manager quota-request create`, usually approved at once).
+- Do **not** add a Terraform `apply` step to CI without an explicit human confirmation — an
+  accidentally created cluster costs money every hour.
+- The design rationale (why one zone, preemptible nodes, in-cluster PostgreSQL, NLB instead of
+  ingress/ALB) lives in `docs/cloud/technical-design.md`; keep it consistent with `terraform/`
+  and `k8s/` when you change either.
+
 ## CI
 
-`.github/workflows/deploy.yml`: `push` to `main` + `workflow_dispatch`, serialized by
-`concurrency: deploy-production` (no cancel), checks out the repo, installs `ansible-core` in a
-venv + `community.general`, runs `deploy.yml` over SSH (`SSH_HOST` / `SSH_USER` / `SSH_KEY` from
-secrets), then a smoke test through nginx. **No test job** — if you add one, it should run before
-the deploy step, not as a separate workflow, because the deploy mutates production anyway.
+Three workflows in `.github/workflows/`:
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `ci.yml` | every push/PR | typecheck matrix (3 services + tests), `docker compose up -d --build`, 52 E2E tests, Newman collection; no cloud |
+| `deploy-cloud.yml` | `workflow_dispatch` only | build/push three images to Container Registry, apply manifests, smoke, E2E against the stand |
+| `infra.yml` | `workflow_dispatch` only | `terraform fmt/validate/plan`, then `apply` or `destroy` of the saved plan |
+
+- `deploy-cloud.yml` and `infra.yml` run in the `cloud-stand` GitHub Environment with a **required
+  reviewer** — a run waits for manual approval before doing anything that costs money.
+- Terraform state is remote (Object Storage bucket, configured by `scripts/init-state.sh`); the
+  runner is ephemeral, so a local state would be lost and `destroy` would not see the resources.
+- Both workflows use composite actions `.github/actions/yc-setup` (yc + kubectl + SA key) and
+  `.github/actions/tf-setup` (terraform + backend + init). Auth is a service-account JSON key in
+  GitHub Secrets; there are no long-lived user OAuth tokens in CI.
+- `deploy-cloud.yml` takes `action=deploy|smoke|destroy-namespace`; `destroy-namespace` removes the
+  NLB/PVC but keeps the cluster. Full teardown is `infra.yml action=destroy confirm=destroy`.
+- Do not add a `push` trigger to the cloud workflows: a forgotten cluster costs the whole grant.
 
 ## Rules
 

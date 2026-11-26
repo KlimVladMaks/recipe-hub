@@ -14,8 +14,11 @@ info:
     между сервисами. Они доступны только внутри docker-сети и наружу не проксируются.
 
 servers:
-  - url: http://localhost:3000/api
-    description: API-шлюз (локальная разработка)
+  # Относительный URL: Swagger UI подставляет хост, на котором открыт
+  # /api-docs. Работает и локально (http://localhost:3000/api), и в облаке
+  # (http://<IP>/api) без правки спецификации.
+  - url: /api
+    description: API-шлюз на текущем хосте (локально и в облаке)
 
 tags:
   - name: Auth

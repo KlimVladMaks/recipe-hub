@@ -8,3 +8,17 @@ node_modules/
 .env.*
 !.env.example
 deploy/.env
+# --- Cloud study stand (Yandex Cloud) ---
+deploy/cloud/.secrets.env
+deploy/cloud/.env
+deploy/cloud/terraform/.terraform/
+deploy/cloud/terraform/*.tfstate
+deploy/cloud/terraform/*.tfstate.*
+deploy/cloud/terraform/terraform.tfvars
+deploy/cloud/terraform/tfplan
+site/
+deploy/cloud/.rendered/
+deploy/cloud/.last-tag
+deploy/cloud/.url
+deploy/cloud/.ci/
+deploy/cloud/terraform/backend.hcl

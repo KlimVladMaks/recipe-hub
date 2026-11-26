@@ -1,0 +1,18 @@
+# Пример конфигурации S3-бэкенда для remote state в Yandex Object Storage.
+#
+# Рабочий файл backend.hcl создаётся скриптом `deploy/cloud/scripts/init-state.sh`
+# и в git не попадает (там ключ доступа). В CI эти же значения приходят из
+# GitHub Secrets.
+
+bucket = "recipehub-tfstate-<folder-id>"
+key    = "recipehub/terraform.tfstate"
+region = "ru-central1"
+
+endpoints = {
+  s3 = "https://storage.yandexcloud.net"
+}
+
+skip_region_validation      = true
+skip_credentials_validation = true
+skip_requesting_account_id  = true
+skip_s3_checksum            = true
