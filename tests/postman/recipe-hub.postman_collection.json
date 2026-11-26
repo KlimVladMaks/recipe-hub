@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "recipe-hub-deployed",
-    "description": "Проверка развёрнутого на VPS сервиса RecipeHub (ЛР4).\nСценарий самодостаточен: health всех микросервисов, admin/directory, сквозной пользовательский поток (регистрация → рецепты → шаги → поиск/фильтры → рейтинг → комментарии/лайки → избранное → подписка → лента) и полная очистка с проверкой удаления, чтобы БД оставалась чистой.",
+    "name": "RecipeHub API — E2E",
+    "description": "Коллекция для проверки и документирования API RecipeHub.\n\nПокрывает сквозной сценарий: health всех трёх сервисов → bootstrap-админ и справочники → регистрация автора и подписчика → рецепты, шаги, медиа → поиск и фильтры → рейтинг → комментарии и лайки → избранное → подписки → персональная лента → полная очистка.\n\nЗапуск:\n- локально: `npm run test:postman` из каталога `tests` (по умолчанию `http://localhost:3000/api`);\n- в облаке: окружение `cloud` или `--env-var baseUrl=http://<IP-балансировщика>/api`.\n\nСценарий самодостаточен: все сущности создаются с уникальными именами и удаляются в конце, поэтому повторные прогоны не конфликтуют, а БД остаётся чистой.\n\nOpenAPI-спецификация — `docs/openapi.yaml`, Swagger UI — `/api-docs` на шлюзе.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -32,7 +32,8 @@
                 "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\nconst body = pm.response.json();\n\npm.test(\"Ответ — объект со status OK и timestamp/uptime\", function () {\n    pm.expect(body).to.be.an(\"object\");\n    pm.expect(body.status).to.be.a(\"string\").and.to.include(\"OK\");\n    pm.expect(body.timestamp).to.be.a(\"string\").and.not.empty;\n    pm.expect(body.uptime).to.be.a(\"number\");\n});"
               }
             }
-          ]
+          ],
+          "description": "Шлюз жив и отдаёт `status`, `timestamp` и `uptime`. Если этот запрос падает, остальные проверки не имеют смысла."
         },
         {
           "name": "Проверка user-service",
@@ -86,7 +87,8 @@
             }
           ]
         }
-      ]
+      ],
+      "description": "Проверка доступности всех трёх сервисов через шлюз: `/api-gateway-health`, `/user-service-health`, `/recipe-service-health`. Ничего не создаёт и не требует авторизации — удобно как smoke-тест сразу после деплоя."
     },
     {
       "name": "2. Справочники (bootstrap-админ)",
@@ -130,7 +132,8 @@
                 "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\nconst body = pm.response.json();\n\npm.test(\"Ответ содержит user и jwtToken\", function () {\n    pm.expect(body).to.have.property(\"user\");\n    pm.expect(body).to.have.property(\"jwtToken\");\n});\n\npm.test(\"Пользователь — админ\", function () {\n    pm.expect(body.user.role).to.eql(\"admin\");\n});\n\npm.collectionVariables.set(\"adminJWT\", body.jwtToken);\npm.collectionVariables.set(\"adminId\", body.user.id);\npm.test(\"В ответе нет пароля\", function () {\n    pm.expect(body.user).to.not.have.property(\"passwordHash\");\n    pm.expect(body.user).to.not.have.property(\"password\");\n});"
               }
             }
-          ]
+          ],
+          "description": "Логин `admin`/`admin123` (задаётся `ADMIN_USERNAME`/`ADMIN_PASSWORD`). JWT админа используется для создания и удаления справочников."
         },
         {
           "name": "Создание типа блюда (админ)",
@@ -190,7 +193,8 @@
                 "exec": "pm.test(\"Статус код 201\", function () {\n    pm.response.to.have.status(201);\n});\nconst body = pm.response.json();\n\npm.test(\"Созданный тип содержит id и title\", function () {\n    pm.expect(body.id).to.be.a(\"number\");\n    pm.expect(body.title).to.eql(pm.collectionVariables.get(\"dishTitle\"));\n});\n\npm.collectionVariables.set(\"dishTypeId\", body.id);"
               }
             }
-          ]
+          ],
+          "description": "Админ-эндпоинт `POST /dish-types`: проверяются права, валидация, уникальность названия и поля ответа."
         },
         {
           "name": "Создание ингредиента (админ)",
@@ -250,7 +254,8 @@
                 "exec": "pm.test(\"Статус код 201\", function () {\n    pm.response.to.have.status(201);\n});\nconst body = pm.response.json();\n\npm.test(\"Созданный ингредиент содержит id и title\", function () {\n    pm.expect(body.id).to.be.a(\"number\");\n    pm.expect(body.title).to.eql(pm.collectionVariables.get(\"ingredientTitle\"));\n});\n\npm.collectionVariables.set(\"ingredientId\", body.id);"
               }
             }
-          ]
+          ],
+          "description": "Аналогично типу блюда: `POST /ingredients`, затем поиск по названию в следующем запросе."
         },
         {
           "name": "Поиск типа блюда по названию",
@@ -336,7 +341,8 @@
             }
           ]
         }
-      ]
+      ],
+      "description": "Bootstrap-админ входит в систему и создаёт справочные данные (тип блюда, ингредиент), после чего проверяет поиск по названию. Демонстрирует админ-права и валидацию; созданные записи удаляются в папке 4."
     },
     {
       "name": "3. Основной сценарий",
@@ -391,7 +397,8 @@
                 "exec": "pm.test(\"Статус код 201\", function () {\n    pm.response.to.have.status(201);\n});\nconst body = pm.response.json();\n\npm.test(\"Ответ содержит все требуемые поля\", function () {\n    pm.expect(body).to.have.property(\"id\");\n    pm.expect(body).to.have.property(\"username\");\n    pm.expect(body).to.have.property(\"firstName\");\n    pm.expect(body).to.have.property(\"lastName\");\n    pm.expect(body).to.have.property(\"role\");\n    pm.expect(body.role).to.eql(\"user\");\n});\n\npm.test(\"Username совпадает с ожидаемым\", function () {\n    pm.expect(body.username).to.eql(pm.collectionVariables.get(\"authorUsername\"));\n});\n\npm.test(\"Пароль не возвращается\", function () {\n    pm.expect(body).to.not.have.property(\"passwordHash\");\n});\n\npm.collectionVariables.set(\"authorId\", body.id);"
               }
             }
-          ]
+          ],
+          "description": "Имя генерируется в pre-request скрипте с уникальным префиксом, чтобы повторные прогоны не упирались в 409."
         },
         {
           "name": "Вход автора",
@@ -494,7 +501,8 @@
                 "exec": "pm.test(\"Статус код 201\", function () {\n    pm.response.to.have.status(201);\n});\nconst body = pm.response.json();\n\npm.test(\"Рецепт содержит обязательные поля\", function () {\n    pm.expect(body).to.have.property(\"id\");\n    pm.expect(body.title).to.eql(pm.collectionVariables.get(\"recipe1Title\"));\n    pm.expect(body.difficulty).to.eql(\"hard\");\n    pm.expect(body.isPublished).to.eql(true);\n    pm.expect(body.media).to.have.lengthOf(2);\n    pm.expect(body.author.id).to.eql(pm.collectionVariables.get(\"authorId\"));\n});\n\npm.test(\"Справочники подставлены в рецепт\", function () {\n    pm.expect(body.dishTypes.some(function (d) { return d.id === pm.collectionVariables.get(\"dishTypeId\"); })).to.be.true;\n    pm.expect(body.ingredients.some(function (i) { return i.id === pm.collectionVariables.get(\"ingredientId\"); })).to.be.true;\n});\n\npm.collectionVariables.set(\"recipe1Id\", body.id);"
               }
             }
-          ]
+          ],
+          "description": "Полный `POST /recipes` за один запрос: сложность `hard`, два типа блюда, ингредиенты, медиа и пошаговые инструкции."
         },
         {
           "name": "Создание 2-го рецепта (сложность easy)",
@@ -544,7 +552,8 @@
                 "exec": "pm.test(\"Статус код 201\", function () {\n    pm.response.to.have.status(201);\n});\nconst body = pm.response.json();\n\npm.test(\"2-й рецепт создан с difficulty=easy\", function () {\n    pm.expect(body.title).to.eql(pm.collectionVariables.get(\"recipe2Title\"));\n    pm.expect(body.difficulty).to.eql(\"easy\");\n    pm.expect(body.author.id).to.eql(pm.collectionVariables.get(\"authorId\"));\n});\n\npm.collectionVariables.set(\"recipe2Id\", body.id);"
               }
             }
-          ]
+          ],
+          "description": "Второй рецепт нужен для проверки фильтров и обновления: у него другая сложность и один тип блюда."
         },
         {
           "name": "Добавление 1-го шага ко 2-му рецепту",
@@ -596,7 +605,8 @@
                 "exec": "pm.test(\"Статус код 201\", function () {\n    pm.response.to.have.status(201);\n});"
               }
             }
-          ]
+          ],
+          "description": "Шаги добавляются отдельными запросами `POST /recipes/{id}/steps` и затем проверяются списком."
         },
         {
           "name": "Добавление 2-го шага ко 2-му рецепту",
@@ -869,7 +879,8 @@
                 "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\npm.test(\"Ответ — конверт пагинации с items\", function () {\n    const body = pm.response.json();\n    pm.expect(body).to.be.an(\"object\");\n    pm.expect(body.items).to.be.an(\"array\");\n    pm.expect(body).to.have.property(\"total\");\n    pm.expect(body).to.have.property(\"page\");\n    pm.expect(body).to.have.property(\"limit\");\n});\nconst ids = pm.response.json().items.map(function (r) { return r.id; });\npm.test(\"Есть 2-й рецепт, нет 1-го\", function () {\n    pm.expect(ids).to.include(pm.collectionVariables.get(\"recipe2Id\"));\n    pm.expect(ids).to.not.include(pm.collectionVariables.get(\"recipe1Id\"));\n});"
               }
             }
-          ]
+          ],
+          "description": "Проверяет два фильтра сразу: `difficulty` и `search` по уникальному префиксу. В выдаче должен остаться только второй рецепт и конверт пагинации."
         },
         {
           "name": "Фильтр по типу блюда (1-й рецепт)",
@@ -1064,7 +1075,8 @@
                 "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\nconst body = pm.response.json();\n\npm.test(\"avgRating=5, userRating=5\", function () {\n    pm.expect(body.avgRating).to.eql(5);\n    pm.expect(body.userRating).to.eql(5);\n});"
               }
             }
-          ]
+          ],
+          "description": "`PUT /recipes/{id}/rating` — идемпотентная оценка пользователя; следующий `GET` проверяет среднее и собственную оценку."
         },
         {
           "name": "Проверка оценки 2-го рецепта (avg=5, user=5)",
@@ -1164,7 +1176,8 @@
                 "exec": "pm.test(\"Статус код 201\", function () {\n    pm.response.to.have.status(201);\n});\nconst body = pm.response.json();\n\npm.test(\"Комментарий содержит id, текст и автора-подписчика\", function () {\n    pm.expect(body.id).to.be.a(\"number\");\n    pm.expect(body.text).to.eql(pm.collectionVariables.get(\"commentText\"));\n    pm.expect(body.user.id).to.eql(pm.collectionVariables.get(\"userId\"));\n});\n\npm.collectionVariables.set(\"commentId\", body.id);"
               }
             }
-          ]
+          ],
+          "description": "Комментарий создаётся подписчиком; далее проверяются его лайк, снятие лайка и удаление."
         },
         {
           "name": "Список комментариев (1, автор — подписчик)",
@@ -1440,7 +1453,8 @@
                 "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});"
               }
             }
-          ]
+          ],
+          "description": "Проверяет `POST`/`GET /recipes/{id}/save` и попадание рецепта в `/users/me/saved-recipes`."
         },
         {
           "name": "Проверка статуса сохранения (isSaved=true)",
@@ -1554,7 +1568,8 @@
                 "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});"
               }
             }
-          ]
+          ],
+          "description": "Подписчик подписывается на автора; проверяются статус подписки, список подписок и персональная лента."
         },
         {
           "name": "Проверка подписки (isSubscribed=true)",
@@ -1668,9 +1683,11 @@
                 "exec": "pm.test(\"Статус код 200\", function () {\n    pm.response.to.have.status(200);\n});\npm.test(\"Ответ — конверт пагинации с items\", function () {\n    const body = pm.response.json();\n    pm.expect(body).to.be.an(\"object\");\n    pm.expect(body.items).to.be.an(\"array\");\n    pm.expect(body).to.have.property(\"total\");\n    pm.expect(body).to.have.property(\"page\");\n    pm.expect(body).to.have.property(\"limit\");\n});\nconst ids = pm.response.json().items.map(function (r) { return r.id; });\npm.test(\"Содержит оба рецепта автора\", function () {\n    pm.expect(ids).to.include(pm.collectionVariables.get(\"recipe1Id\"));\n    pm.expect(ids).to.include(pm.collectionVariables.get(\"recipe2Id\"));\n});"
               }
             }
-          ]
+          ],
+          "description": "`/users/me/feed` — композиция на стороне шлюза: рецепты авторов, на которых подписан текущий пользователь."
         }
-      ]
+      ],
+      "description": "Сквозной пользовательский поток от регистрации до персональной ленты. Все данные создаются с уникальным префиксом, поэтому прогон можно повторять; проверяются коды ответов, обязательные поля и конверт пагинации `{ items, total, page, limit }`."
     },
     {
       "name": "4. Очистка и проверка удаления",
@@ -1862,7 +1879,8 @@
                 "exec": "pm.test(\"Статус код 204\", function () {\n    pm.response.to.have.status(204);\n});"
               }
             }
-          ]
+          ],
+          "description": "Проверяет каскадное удаление связанных сущностей: шаги, оценки, сохранения и комментарии не должны остаться в БД."
         },
         {
           "name": "2-й рецепт исчез (404)",
@@ -2162,7 +2180,8 @@
                 "exec": "pm.test(\"Статус код 401\", function () {\n    pm.response.to.have.status(401);\n});"
               }
             }
-          ]
+          ],
+          "description": "После `DELETE /users/me` логин должен отвечать 401 — подтверждение, что пользователь действительно удалён, а не просто скрыт."
         },
         {
           "name": "Вход удалённого подписчика запрещён (401)",
@@ -2205,7 +2224,8 @@
             }
           ]
         }
-      ]
+      ],
+      "description": "Удаление всех созданных сущностей и проверка, что они действительно исчезли (404), а вход удалённых пользователей запрещён (401). Bootstrap-админ не удаляется — это служебная запись."
     }
   ],
   "event": [
@@ -2231,7 +2251,7 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://139.100.225.216/api"
+      "value": "http://localhost:3000/api"
     },
     {
       "key": "adminUsername",

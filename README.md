@@ -1,9 +1,27 @@
 # RecipeHub
 
-[![CI](https://github.com/KlimVladMaks/recipe-hub/actions/workflows/ci.yml/badge.svg?branch=feature/cloud)](https://github.com/KlimVladMaks/recipe-hub/actions/workflows/ci.yml)
+[![CI](https://github.com/KlimVladMaks/recipe-hub/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/KlimVladMaks/recipe-hub/actions/workflows/ci.yml)
+[![Docs](https://github.com/KlimVladMaks/recipe-hub/actions/workflows/docs.yml/badge.svg?branch=main)](https://klimvladmaks.github.io/recipe-hub/)
 
 Сервис для обмена рецептами и кулинарных блогов. Учебный проект (ИТМО, «Бэкенд-разработка»),
 реализованный как набор микросервисов на Node.js + TypeScript.
+
+## Документация
+
+- **Сайт** (MkDocs Material, GitHub Pages): <https://klimvladmaks.github.io/recipe-hub/> —
+  архитектура, быстрый старт, API, Postman, тестирование и технический дизайн.
+- **OpenAPI / Swagger UI**: спецификация `docs/openapi.yaml`, интерактивная страница
+  `/api-docs` и JSON `/openapi.json` на шлюзе после запуска.
+- **Postman**: коллекция и окружения в `tests/postman/` (52 запроса, сквозной сценарий).
+
+Сайт собирается из каталога `docs/` той же кодовой базой, что и приложение, поэтому
+документация не отстаёт от кода. Локальная проверка:
+
+```bash
+python3 -m venv .venv-docs && .venv-docs/bin/pip install -r requirements-docs.txt
+.venv-docs/bin/mkdocs serve        # http://127.0.0.1:8000/recipe-hub/
+```
+
 
 ## Возможности
 
@@ -112,12 +130,14 @@ Yandex Managed Service for Kubernetes. Он поднимается через Te
 ## CI/CD
 
 - **CI** (`.github/workflows/ci.yml`) — на каждый push и PR: проверка типов всех
-  сервисов, сборка docker compose, 52 E2E-теста и коллекция Postman. Облако не
-  используется, прогон бесплатный.
+  сервисов, линт OpenAPI (`redocly lint`), сборка docker compose, 52 E2E-теста и
+  коллекция Postman. Облако не используется, прогон бесплатный.
 - **CD** (`deploy-cloud.yml`) — только вручную: сборка и пуш образов в Container
   Registry, деплой в Kubernetes, smoke и E2E против облачного стенда.
 - **Инфраструктура** (`infra.yml`) — только вручную: `terraform plan`, затем
   `apply` или `destroy` после подтверждения.
+- **Документация** (`docs.yml`) — строгая сборка MkDocs на PR и публикация сайта
+  на GitHub Pages из `main`.
 
 Деплой и Terraform требуют подтверждения в GitHub Environment `cloud-stand`,
 поэтому push в ветку не может создать платный кластер. Подробности и команды —
@@ -188,20 +208,25 @@ services/
   recipe/          # recipe-service, ESM
 docs/
   openapi.yaml     # OpenAPI-спецификация публичного и внутреннего API
+  index.md         # главная страница сайта документации (MkDocs)
 tests/             # E2E-тесты (node:test + tsx) и Postman-коллекция
 deploy/            # Infrastructure as Code: nginx, скрипты, prod-compose, мониторинг
-.github/workflows/ # CI: автодеплой на VPS при push в main
+.github/workflows/ # CI/CD: проверки, деплой в облако, публикация документации
+mkdocs.yml         # конфигурация сайта документации (Material)
 docker-compose.yml
 AGENTS.md          # заметки для ИИ-агентов и разработчиков
 ```
 
 ## Документация API
 
-- `docs/openapi.yaml` — актуальная OpenAPI 3 спецификация (публичные и `internal` маршруты).
-- Swagger UI в шлюзе: `/api-docs`.
-- Postman: `tests/postman/recipe-hub.postman_collection.json` (регистрация → вход → рецепт →
-  шаги → комментарий/лайк → рейтинг → подписка → лента); запуск —
-  `cd tests && npm run test:postman` (newman).
+- `docs/openapi.yaml` — актуальная OpenAPI 3 спецификация (публичные и `internal` маршруты);
+  проверяется `redocly lint` в CI (`npx @redocly/cli@2.84.0 lint docs/openapi.yaml`).
+- Swagger UI в шлюзе: `/api-docs`, JSON-версия спеки — `/openapi.json`.
+- Postman: `tests/postman/` — коллекция (52 запроса) и окружения `local`/`cloud`;
+  запуск — `cd tests && npm run test:postman` (newman). Подробности —
+  `tests/postman/README.md`.
+- Сайт документации: <https://klimvladmaks.github.io/recipe-hub/>; страницы лежат
+  в `docs/`, сборка — `mkdocs build --strict`.
 
 ## Prisma
 
