@@ -35,7 +35,7 @@ spec:
     spec:
       containers:
         - name: rabbitmq
-          image: rabbitmq:4.1-management-alpine
+          image: __REGISTRY__/recipehub-rabbitmq:__TAG__
           ports:
             - name: amqp
               containerPort: 5672

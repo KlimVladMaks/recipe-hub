@@ -32,7 +32,7 @@ spec:
     spec:
       initContainers:
         - name: wait-for-db
-          image: busybox:1.37
+          image: __REGISTRY__/recipehub-busybox:__TAG__
           command:
             - sh
             - -c
