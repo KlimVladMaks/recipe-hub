@@ -35,6 +35,9 @@ permissions:
 env:
   TF_IN_AUTOMATION: 'true'
   TF_INPUT: '0'
+  # Переменные Terraform приходят из секретов: terraform.tfvars в git нет.
+  TF_VAR_cloud_id: ${{ secrets.YC_CLOUD_ID }}
+  TF_VAR_folder_id: ${{ secrets.YC_FOLDER_ID }}
 
 jobs:
   plan:
