@@ -180,6 +180,8 @@ yc quota-manager quota-limit list --service compute \
 
 ## Что уже проверено
 
+Локальный контур (ЛР7):
+
 - Кластер Managed Kubernetes 1.35 (зональный мастер, Calico) — `HEALTHY`.
 - Один прерываемый узел 2 vCPU / 4 ГБ, диск 64 ГБ HDD.
 - Все сервисы, PostgreSQL и RabbitMQ запущены в namespace `recipehub`.
@@ -187,6 +189,29 @@ yc quota-manager quota-limit list --service compute \
   создаёт контроллер облака).
 - `make smoke` — health всех сервисов и Swagger UI.
 - `make test` — 52 E2E-теста, все проходят против облака.
+
+Полный цикл через GitHub Actions (ДЗ8):
+
+1. `ci.yml` — на push: typecheck четырёх проектов, `docker compose`, 52 E2E,
+   коллекция Postman (Newman). Облако не использовалось.
+2. `infra.yml action=plan` — план на 14 ресурсов, артефакт и summary.
+3. `infra.yml action=apply` — 14 ресурсов создано, кластер `HEALTHY`.
+4. `deploy-cloud.yml action=deploy` — 6 образов в реестре (3 сервиса +
+   postgres/rabbitmq/busybox), rollout, smoke, **52/52 E2E против облака**.
+5. `deploy-cloud.yml action=smoke` — повторная проверка без пересборки.
+6. `infra.yml action=destroy confirm=destroy` — namespace, NLB, диски,
+   образы и все Terraform-ресурсы удалены; проверка остатков пустая.
+
+Что выяснилось на практике и уже учтено в коде:
+
+- **Docker Hub с узлов недоступен** (`registry-1.docker.io` — i/o timeout),
+  поэтому postgres, rabbitmq и busybox зеркалируются в Container Registry
+  (`scripts/mirror-images.sh`), манифесты ссылаются на `__REGISTRY__`.
+- **StatefulSet не заменяет под, зависший в `ImagePullBackOff`** — он ждёт
+  `Ready`. `scripts/cleanup-stale-pods.sh` удаляет поды со старым тегом.
+- **Rollout на одном узле упирается в CPU**: во время обновления старые и
+  новые поды сосуществуют, requests доходят до 95 % и Cluster Autoscaler
+  добавляет второй узел. Для ЛР8 это готовый сценарий для HPA/тюнинга.
 
 ## Правила безопасности и экономии
 

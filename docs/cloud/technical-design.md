@@ -1061,6 +1061,13 @@ Terraform'у, чтобы создавать сеть, кластер и серв
 | Стоимость и правила экономии | `deploy/cloud/README.md` |
 | Спецификация API | `docs/openapi.yaml` |
 | E2E-проверка | `tests/` |
+| CI (typecheck, E2E, Newman) | `.github/workflows/ci.yml` |
+| CD (сборка, пуш, деплой, smoke) | `.github/workflows/deploy-cloud.yml` |
+| Инфраструктура (plan/apply/destroy) | `.github/workflows/infra.yml` |
+| Аутентификация и Terraform в CI | `.github/actions/yc-setup`, `.github/actions/tf-setup` |
+| Зеркалирование образов | `deploy/cloud/scripts/mirror-images.sh` |
+| Пересоздание подов на старых образах | `deploy/cloud/scripts/cleanup-stale-pods.sh` |
+| Remote state (подготовка) | `deploy/cloud/scripts/init-state.sh`, `terraform/backend.tf` |
 
 ## Приложение B. Инциденты первого запуска и выводы
 
@@ -1081,6 +1088,27 @@ Terraform'у, чтобы создавать сеть, кластер и серв
 Итог первого полного цикла: кластер `HEALTHY`, все поды `1/1`, публичный IP
 выдан, Swagger и health отвечают 200, **52 E2E-теста прошли против облака**,
 затем 13 ресурсов удалены без остатков.
+
+## Приложение B2. Инциденты первого прогона CI/CD (ДЗ8)
+
+Первый прогон пайплайна — это отдельный класс ошибок: то, что работает на
+ноутбуке, ломается на одноразовом раннере и в чужой сети. Ниже — всё, что
+пришлось исправить, прежде чем пайплайн стал зелёным.
+
+| Инцидент | Причина | Что сделано | Вывод для дизайна |
+|---|---|---|---|
+| `workflow_dispatch` возвращал 404 | GitHub регистрирует workflow только из основной ветки | работа ведётся в PR, после merge workflow доступны из `main` | процесс ветвления — часть дизайна доставки |
+| `plan` падал: `No value for required variable: folder_id` | `terraform.tfvars` в git не хранится | `TF_VAR_cloud_id` / `TF_VAR_folder_id` из секретов | в CI переменные приходят только из окружения |
+| `apply` не находил `tfplan` | `upload-artifact` с двумя путями сохраняет общий префикс каталогов | план выгружается одним файлом, добавлена проверка `test -f tfplan` | артефакты между job'ами — источник тонких ошибок |
+| `yc` в CI: `get IAM token from metadata service: 404` | `YC_SERVICE_ACCOUNT_KEY_FILE` понимает Terraform, но не CLI | ключ прописывается в конфиг CLI (`yc config set service-account-key`) | у каждого инструмента свой способ аутентификации |
+| postgres/rabbitmq/busybox: `ImagePullBackOff` | с узлов в ru-central1 Docker Hub недоступен (`i/o timeout`) | образы зеркалируются в Container Registry, манифесты ссылаются на `__REGISTRY__` | внешние реестры — зависимость, которую нужно убирать |
+| rollout висел 5 минут | StatefulSet ждёт `Ready` и не заменяет под, застрявший на старом образе | `cleanup-stale-pods.sh` удаляет поды с устаревшим тегом | обновление StatefulSet — отдельный сценарий, не такой, как у Deployment |
+| во время rollout под `Pending`: `Insufficient cpu` | старые и новые поды сосуществуют, requests доходят до 95 % | Cluster Autoscaler добавил второй узел, rollout завершился | `maxSurge`/requests нужно считать вместе, это задача ЛР8 |
+
+Итог прогона: `apply` создал 14 ресурсов, `deploy` собрал и запушил 6 образов,
+smoke прошёл, **52 E2E-теста прошли против облака** (`http://89.169.136.103/api`),
+`destroy` удалил всё без остатков. Стоимость часа работы стенда — в пределах
+оценки из раздела 10.
 
 ## Приложение C. Глоссарий
 
