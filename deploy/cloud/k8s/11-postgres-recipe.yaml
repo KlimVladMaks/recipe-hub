@@ -34,7 +34,7 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: postgres:18.3-alpine
+          image: __REGISTRY__/recipehub-postgres:__TAG__
           ports:
             - name: postgres
               containerPort: 5432

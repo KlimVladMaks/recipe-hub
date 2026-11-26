@@ -104,6 +104,9 @@ jobs:
             docker build -t "$REGISTRY/$name:$tag" "services/$dir"
             docker push "$REGISTRY/$name:$tag"
           done
+          # Узлы кластера не могут тянуть Docker Hub (i/o timeout), поэтому
+          # postgres/rabbitmq/busybox тоже кладём в свой реестр.
+          REGISTRY="$REGISTRY" TAG="$tag" ./deploy/cloud/scripts/mirror-images.sh
           echo "- образы: \`$tag\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Apply Kubernetes manifests

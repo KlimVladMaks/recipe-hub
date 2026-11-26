@@ -21,4 +21,7 @@ for pair in "api-gateway:recipehub-api-gateway" "user:recipehub-user" "recipe:re
   docker push "$registry/$name:$tag" >/dev/null
 done
 
+log "копирую инфраструктурные образы (postgres, rabbitmq, busybox)"
+REGISTRY="$registry" TAG="$tag" "$CLOUD_DIR/scripts/mirror-images.sh"
+
 log "образы готовы, тег: $tag"
