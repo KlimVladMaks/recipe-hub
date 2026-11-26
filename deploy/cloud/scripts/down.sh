@@ -3,6 +3,11 @@
 # затем terraform destroy.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
+# State может лежать в Object Storage (backend.hcl) — тогда инициализация
+# обязательна, иначе terraform не увидит созданные ресурсы.
+log "terraform init"
+terraform_init || warn "terraform init не удался — проверяю по локальному state"
+
 if [ -z "$(tf_out cluster_id 2>/dev/null || true)" ]; then
   warn "в terraform state нет кластера — удалять нечего"
 else

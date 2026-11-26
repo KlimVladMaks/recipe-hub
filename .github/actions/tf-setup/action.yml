@@ -1,0 +1,65 @@
+# Подготовка Terraform в CI: установка, S3-бэкенд в Object Storage, init.
+#
+# Remote state нужен, чтобы `apply` и `destroy` из разных запусков видели одни
+# и те же ресурсы: раннер одноразовый, локальный state потерялся бы вместе с ним.
+
+name: Terraform setup
+description: Устанавливает Terraform, настраивает backend.hcl и выполняет init
+
+inputs:
+  terraform-version:
+    description: Версия Terraform
+    required: false
+    default: '1.16.5'
+  state-bucket:
+    description: Бакет Object Storage для state
+    required: true
+  state-access-key:
+    description: Access key для S3-бэкенда
+    required: true
+  state-secret-key:
+    description: Secret key для S3-бэкенда
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ inputs.terraform-version }}
+        terraform_wrapper: false
+
+    - name: Write backend configuration
+      shell: bash
+      env:
+        STATE_BUCKET: ${{ inputs.state-bucket }}
+        STATE_ACCESS_KEY: ${{ inputs.state-access-key }}
+        STATE_SECRET_KEY: ${{ inputs.state-secret-key }}
+      run: |
+        set -euo pipefail
+        backend="$RUNNER_TEMP/backend.hcl"
+        cat > "$backend" <<EOF
+        bucket = "$STATE_BUCKET"
+        key    = "recipehub/terraform.tfstate"
+        region = "ru-central1"
+
+        endpoints = {
+          s3 = "https://storage.yandexcloud.net"
+        }
+
+        access_key = "$STATE_ACCESS_KEY"
+        secret_key = "$STATE_SECRET_KEY"
+
+        skip_region_validation      = true
+        skip_credentials_validation = true
+        skip_requesting_account_id  = true
+        skip_s3_checksum            = true
+        EOF
+        chmod 600 "$backend"
+        echo "TF_BACKEND_CONFIG=$backend" >> "$GITHUB_ENV"
+
+    - name: terraform init
+      shell: bash
+      working-directory: deploy/cloud/terraform
+      run: terraform init -input=false -no-color -backend-config="$TF_BACKEND_CONFIG"

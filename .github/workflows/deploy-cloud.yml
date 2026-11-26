@@ -1,0 +1,224 @@
+# CD: доставка приложения в облачный стенд Yandex Cloud.
+#
+# Запускается ТОЛЬКО вручную (`workflow_dispatch`) и только после подтверждения
+# в GitHub Environment `cloud-stand`: стенд стоит денег, поэтому авто-деплой на
+# push здесь неуместен. Инфраструктура создаётся отдельно — `infra.yml`.
+#
+# Действия:
+#   deploy           — собрать и запушить образы, применить манифесты, smoke, E2E
+#   smoke            — только проверить уже развёрнутый стенд (без пересборки)
+#   destroy-namespace — удалить namespace (вместе с ним NLB и PVC), не трогая кластер
+
+name: Deploy to cloud
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Что сделать
+        type: choice
+        options:
+          - deploy
+          - smoke
+          - destroy-namespace
+        default: deploy
+      image_tag:
+        description: Тег образов (по умолчанию — короткий SHA текущего коммита)
+        type: string
+        required: false
+      run_e2e:
+        description: Прогнать E2E-тесты против облака
+        type: boolean
+        default: true
+
+# Один стенд — одна операция: параллельные деплои подрались бы за манифесты.
+concurrency:
+  group: cloud-stand
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CLUSTER_NAME: recipehub-cloud
+  REGISTRY_NAME: recipehub-registry
+  NAMESPACE: recipehub
+
+jobs:
+  deploy:
+    name: ${{ inputs.action }} · ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: cloud-stand
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up yc and kubectl
+        uses: ./.github/actions/yc-setup
+        with:
+          sa-key: ${{ secrets.YC_SA_KEY_JSON }}
+          cloud-id: ${{ secrets.YC_CLOUD_ID }}
+          folder-id: ${{ secrets.YC_FOLDER_ID }}
+
+      - name: Resolve cluster and registry
+        id: resolve
+        run: |
+          set -euo pipefail
+          cluster_id="$(yc managed-kubernetes cluster list --format json \
+            | jq -r --arg name "$CLUSTER_NAME" '.[] | select(.name == $name) | .id' | head -1)"
+          registry_id="$(yc container registry list --format json \
+            | jq -r --arg name "$REGISTRY_NAME" '.[] | select(.name == $name) | .id' | head -1)"
+          if [ -z "$cluster_id" ]; then
+            echo "Кластер $CLUSTER_NAME не найден. Сначала запустите infra.yml (action=apply)." >&2
+            exit 1
+          fi
+          if [ -z "$registry_id" ]; then
+            echo "Реестр $REGISTRY_NAME не найден. Сначала запустите infra.yml (action=apply)." >&2
+            exit 1
+          fi
+          echo "cluster_id=$cluster_id" >> "$GITHUB_OUTPUT"
+          echo "registry=cr.yandex/$registry_id" >> "$GITHUB_OUTPUT"
+          echo "### Стенд" >> "$GITHUB_STEP_SUMMARY"
+          echo "- кластер: \`$cluster_id\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- реестр: \`cr.yandex/$registry_id\`" >> "$GITHUB_STEP_SUMMARY"
+          yc managed-kubernetes cluster get-credentials --id "$cluster_id" --external --force
+          kubectl get nodes -o wide
+
+      - name: Build and push images
+        if: inputs.action == 'deploy'
+        env:
+          REGISTRY: ${{ steps.resolve.outputs.registry }}
+          INPUT_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          tag="$INPUT_TAG"
+          [ -n "$tag" ] || tag="$(git rev-parse --short HEAD)"
+          echo "IMAGE_TAG=$tag" >> "$GITHUB_ENV"
+
+          yc iam create-token | docker login cr.yandex --username iam --password-stdin >/dev/null
+          for pair in "api-gateway:recipehub-api-gateway" "user:recipehub-user" "recipe:recipehub-recipe"; do
+            dir="${pair%%:*}"
+            name="${pair##*:}"
+            echo "==> $REGISTRY/$name:$tag"
+            docker build -t "$REGISTRY/$name:$tag" "services/$dir"
+            docker push "$REGISTRY/$name:$tag"
+          done
+          echo "- образы: \`$tag\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply Kubernetes manifests
+        if: inputs.action == 'deploy'
+        env:
+          REGISTRY: ${{ steps.resolve.outputs.registry }}
+          APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
+          APP_USER_DB_PASSWORD: ${{ secrets.APP_USER_DB_PASSWORD }}
+          APP_RECIPE_DB_PASSWORD: ${{ secrets.APP_RECIPE_DB_PASSWORD }}
+          APP_RABBITMQ_PASSWORD: ${{ secrets.APP_RABBITMQ_PASSWORD }}
+          APP_ADMIN_PASSWORD: ${{ secrets.APP_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          # Namespace + Secret + ConfigMap идемпотентно: create --dry-run | apply.
+          kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n "$NAMESPACE" create secret generic recipehub-secrets \
+            --from-literal=JWT_SECRET="$APP_JWT_SECRET" \
+            --from-literal=USER_DB_PASSWORD="$APP_USER_DB_PASSWORD" \
+            --from-literal=RECIPE_DB_PASSWORD="$APP_RECIPE_DB_PASSWORD" \
+            --from-literal=RABBITMQ_PASSWORD="$APP_RABBITMQ_PASSWORD" \
+            --from-literal=ADMIN_PASSWORD="$APP_ADMIN_PASSWORD" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n "$NAMESPACE" create configmap openapi-spec \
+            --from-file=openapi.yaml=docs/openapi.yaml \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          REGISTRY="$REGISTRY" TAG="$IMAGE_TAG" ./deploy/cloud/scripts/render.sh
+          kubectl apply -f deploy/cloud/.rendered
+
+          kubectl -n "$NAMESPACE" rollout status statefulset/user-db --timeout=300s
+          kubectl -n "$NAMESPACE" rollout status statefulset/recipe-db --timeout=300s
+          kubectl -n "$NAMESPACE" rollout status deployment/rabbitmq --timeout=300s
+          kubectl -n "$NAMESPACE" rollout status deployment/user-service --timeout=300s
+          kubectl -n "$NAMESPACE" rollout status deployment/recipe-service --timeout=300s
+          kubectl -n "$NAMESPACE" rollout status deployment/api-gateway --timeout=300s
+          kubectl -n "$NAMESPACE" get pods -o wide
+
+      - name: Wait for the public IP
+        if: inputs.action == 'deploy' || inputs.action == 'smoke'
+        id: lb
+        run: |
+          set -euo pipefail
+          ip=""
+          for _ in $(seq 1 60); do
+            ip="$(kubectl -n "$NAMESPACE" get svc api-gateway \
+              -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
+            [ -n "$ip" ] && break
+            sleep 5
+          done
+          if [ -z "$ip" ]; then
+            echo "Балансировщик не выдал внешний IP за 5 минут" >&2
+            kubectl -n "$NAMESPACE" get svc api-gateway -o wide || true
+            exit 1
+          fi
+          echo "url=http://$ip" >> "$GITHUB_OUTPUT"
+          echo "- приложение: http://$ip/api" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Swagger UI: http://$ip/api-docs" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke test
+        if: inputs.action == 'deploy' || inputs.action == 'smoke'
+        env:
+          BASE_URL: ${{ steps.lb.outputs.url }}
+        run: |
+          set -euo pipefail
+          for path in api-gateway-health user-service-health recipe-service-health; do
+            code="$(curl -s -o /tmp/health.json -w '%{http_code}' --max-time 10 "$BASE_URL/api/$path" || true)"
+            if [ "$code" != "200" ]; then
+              echo "✖ $path -> $code"
+              cat /tmp/health.json 2>/dev/null || true
+              exit 1
+            fi
+            echo "✔ $path -> 200"
+          done
+          # swagger-ui-express отдаёт 301 без завершающего слэша
+          code="$(curl -sL -o /dev/null -w '%{http_code}' --max-time 15 "$BASE_URL/api-docs" || true)"
+          [ "$code" = "200" ] || { echo "✖ Swagger UI -> $code"; exit 1; }
+          echo "✔ Swagger UI -> 200"
+
+      - name: E2E tests against the cloud
+        if: (inputs.action == 'deploy' || inputs.action == 'smoke') && inputs.run_e2e
+        env:
+          BASE_URL: ${{ steps.lb.outputs.url }}
+          TEST_ADMIN_USERNAME: admin
+          TEST_ADMIN_PASSWORD: ${{ secrets.APP_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          cd tests
+          npm ci
+          TEST_BASE_URL="$BASE_URL/api" npm test 2>&1 | tee "$RUNNER_TEMP/e2e.log"
+          npm run test:postman -- --env-var "baseUrl=$BASE_URL/api" \
+            --env-var "adminPassword=$TEST_ADMIN_PASSWORD" 2>&1 | tee "$RUNNER_TEMP/newman.log"
+
+      - name: Delete namespace
+        if: inputs.action == 'destroy-namespace'
+        run: |
+          set -euo pipefail
+          if kubectl get namespace "$NAMESPACE" >/dev/null 2>&1; then
+            kubectl delete namespace "$NAMESPACE" --wait=true --timeout=420s
+          else
+            echo "namespace $NAMESPACE уже отсутствует"
+          fi
+
+      - name: Dump pod state on failure
+        if: failure()
+        run: |
+          kubectl -n "$NAMESPACE" get pods -o wide || true
+          kubectl -n "$NAMESPACE" get events --sort-by=.lastTimestamp | tail -40 || true
+          kubectl -n "$NAMESPACE" logs deploy/api-gateway --tail=200 || true
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-${{ inputs.action }}-logs
+          path: ${{ runner.temp }}/*.log
+          retention-days: 7
+          if-no-files-found: ignore

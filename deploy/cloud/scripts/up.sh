@@ -4,7 +4,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 log "terraform init"
-tf init -input=false >/dev/null
+terraform_init
 
 log "terraform apply (создаём инфраструктуру, ~10–20 мин)"
 tf apply -auto-approve -input=false

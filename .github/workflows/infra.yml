@@ -1,0 +1,206 @@
+# Инфраструктура облачного стенда: Terraform plan / apply / destroy по кнопке.
+#
+# Почему не на push: кластер стоит ~10 ₽/час, а забытый стенд — это грант за
+# две недели. Поэтому apply и destroy требуют ручного запуска и подтверждения
+# в GitHub Environment `cloud-stand`.
+#
+# Job `plan` работает без подтверждения (он ничего не создаёт), job `apply`
+# применяет ровно тот план, который был показан и сохранён артефактом.
+
+name: Cloud infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Что сделать с инфраструктурой
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+        default: plan
+      confirm:
+        description: Для destroy введите слово destroy
+        type: string
+        required: false
+
+concurrency:
+  group: cloud-stand
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TF_IN_AUTOMATION: 'true'
+  TF_INPUT: '0'
+
+jobs:
+  plan:
+    name: Plan (${{ inputs.action }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up yc and kubectl
+        uses: ./.github/actions/yc-setup
+        with:
+          sa-key: ${{ secrets.YC_SA_KEY_JSON }}
+          cloud-id: ${{ secrets.YC_CLOUD_ID }}
+          folder-id: ${{ secrets.YC_FOLDER_ID }}
+
+      - name: Set up Terraform
+        uses: ./.github/actions/tf-setup
+        with:
+          state-bucket: ${{ vars.TF_STATE_BUCKET }}
+          state-access-key: ${{ secrets.TF_STATE_ACCESS_KEY }}
+          state-secret-key: ${{ secrets.TF_STATE_SECRET_KEY }}
+
+      - name: terraform fmt
+        working-directory: deploy/cloud/terraform
+        run: terraform fmt -check -recursive -diff
+
+      - name: terraform validate
+        working-directory: deploy/cloud/terraform
+        run: terraform validate -no-color
+
+      - name: terraform plan
+        working-directory: deploy/cloud/terraform
+        run: |
+          set -euo pipefail
+          args=(-input=false -no-color -lock-timeout=300s -out=tfplan)
+          if [ "${{ inputs.action }}" = "destroy" ]; then
+            args+=(-destroy)
+          fi
+          terraform plan "${args[@]}" | tee "$RUNNER_TEMP/plan.txt"
+          terraform show -no-color tfplan > "$RUNNER_TEMP/plan-show.txt"
+
+      - name: Summarize the plan
+        run: |
+          set -euo pipefail
+          {
+            echo "### Terraform plan: ${{ inputs.action }}"
+            echo '```'
+            grep -E '^(Plan:|No changes|Error)' "$RUNNER_TEMP/plan.txt" || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: |
+            deploy/cloud/terraform/tfplan
+            ${{ runner.temp }}/plan-show.txt
+          retention-days: 3
+
+  apply:
+    name: ${{ inputs.action }}
+    needs: plan
+    if: inputs.action != 'plan'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: cloud-stand
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check destroy confirmation
+        if: inputs.action == 'destroy' && inputs.confirm != 'destroy'
+        run: |
+          echo "Для удаления стенда нужно ввести confirm=destroy" >&2
+          exit 1
+
+      - name: Set up yc and kubectl
+        uses: ./.github/actions/yc-setup
+        with:
+          sa-key: ${{ secrets.YC_SA_KEY_JSON }}
+          cloud-id: ${{ secrets.YC_CLOUD_ID }}
+          folder-id: ${{ secrets.YC_FOLDER_ID }}
+
+      - name: Set up Terraform
+        uses: ./.github/actions/tf-setup
+        with:
+          state-bucket: ${{ vars.TF_STATE_BUCKET }}
+          state-access-key: ${{ secrets.TF_STATE_ACCESS_KEY }}
+          state-secret-key: ${{ secrets.TF_STATE_SECRET_KEY }}
+
+      - name: Download the plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: deploy/cloud/terraform
+
+      # Перед destroy нужно убрать то, что Terraform не создавал: NLB и PVC
+      # появляются из Kubernetes-манифестов, а реестр нельзя удалить с образами.
+      - name: Clean up Kubernetes resources before destroy
+        if: inputs.action == 'destroy'
+        run: |
+          set -euo pipefail
+          cluster_id="$(yc managed-kubernetes cluster list --format json \
+            | jq -r --arg name "recipehub-cloud" '.[] | select(.name == $name) | .id' | head -1)"
+          if [ -n "$cluster_id" ]; then
+            yc managed-kubernetes cluster get-credentials --id "$cluster_id" --external --force
+            if kubectl get namespace recipehub >/dev/null 2>&1; then
+              echo "удаляю namespace recipehub (вместе с ним NLB и PVC)"
+              kubectl delete namespace recipehub --wait=true --timeout=420s || true
+            fi
+            for _ in $(seq 1 60); do
+              count="$(yc load-balancer network-load-balancer list --format json 2>/dev/null | jq 'length' || echo 1)"
+              if [ "$count" = "0" ]; then
+                echo "сетевых балансировщиков не осталось"
+                break
+              fi
+              sleep 5
+            done
+          fi
+
+          registry_id="$(yc container registry list --format json \
+            | jq -r --arg name "recipehub-registry" '.[] | select(.name == $name) | .id' | head -1)"
+          if [ -n "$registry_id" ]; then
+            echo "удаляю образы из реестра $registry_id"
+            for image in $(yc container image list --registry-id "$registry_id" --format json | jq -r '.[].id'); do
+              yc container image delete --id "$image" || true
+            done
+          fi
+
+      - name: terraform ${{ inputs.action }}
+        working-directory: deploy/cloud/terraform
+        run: |
+          set -euo pipefail
+          terraform apply -input=false -no-color -auto-approve -lock-timeout=300s tfplan
+
+      - name: Show the resulting outputs
+        if: always()
+        run: |
+          set -euo pipefail
+          {
+            echo "### ${{ inputs.action }} завершён"
+            echo '```'
+            ( cd deploy/cloud/terraform && terraform output -no-color 2>/dev/null ) || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check for leftovers
+        if: inputs.action == 'destroy'
+        run: |
+          set -euo pipefail
+          echo "### Остатки после destroy" >> "$GITHUB_STEP_SUMMARY"
+          leftovers=0
+          for check in \
+            "yc managed-kubernetes cluster list" \
+            "yc load-balancer network-load-balancer list" \
+            "yc vpc address list" \
+            "yc compute disk list" \
+            "yc container registry list"; do
+            out="$($check --format json 2>/dev/null || true)"
+            count="$(printf '%s' "$out" | jq 'length' 2>/dev/null || echo 0)"
+            if [ "$count" != "0" ]; then
+              echo "- ⚠️ $check: $count" >> "$GITHUB_STEP_SUMMARY"
+              leftovers=1
+            fi
+          done
+          [ "$leftovers" = "0" ] && echo "- платных ресурсов не осталось" >> "$GITHUB_STEP_SUMMARY"

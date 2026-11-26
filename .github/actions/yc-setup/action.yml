@@ -1,0 +1,54 @@
+# Общая подготовка раннера для работы с Yandex Cloud.
+#
+# Устанавливает yc и kubectl и настраивает аутентификацию сервисным аккаунтом.
+# Используется workflow'ами `infra.yml` и `deploy-cloud.yml`, чтобы не
+# дублировать один и тот же блок в двух местах.
+
+name: Yandex Cloud setup
+description: Устанавливает yc и kubectl, экспортирует переменные аутентификации
+
+inputs:
+  sa-key:
+    description: JSON авторизованного ключа сервисного аккаунта
+    required: true
+  cloud-id:
+    description: ID облака
+    required: true
+  folder-id:
+    description: ID каталога
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install yc CLI
+      shell: bash
+      run: |
+        set -euo pipefail
+        curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh \
+          | bash -s -- -i "$HOME/.local" -n
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+    - name: Install kubectl
+      uses: azure/setup-kubectl@v4
+      with:
+        version: latest
+
+    - name: Authenticate as the CI service account
+      shell: bash
+      env:
+        YC_SA_KEY_JSON: ${{ inputs.sa-key }}
+        YC_CLOUD_ID: ${{ inputs.cloud-id }}
+        YC_FOLDER_ID: ${{ inputs.folder-id }}
+      run: |
+        set -euo pipefail
+        install -d -m 700 "$HOME/.yc"
+        printf '%s' "$YC_SA_KEY_JSON" > "$HOME/.yc/sa-key.json"
+        chmod 600 "$HOME/.yc/sa-key.json"
+        {
+          echo "YC_SERVICE_ACCOUNT_KEY_FILE=$HOME/.yc/sa-key.json"
+          echo "YC_CLOUD_ID=$YC_CLOUD_ID"
+          echo "YC_FOLDER_ID=$YC_FOLDER_ID"
+        } >> "$GITHUB_ENV"
+        "$HOME/.local/bin/yc" config set folder-id "$YC_FOLDER_ID" >/dev/null
+        echo "yc: $("$HOME/.local/bin/yc" version 2>/dev/null | head -1)"

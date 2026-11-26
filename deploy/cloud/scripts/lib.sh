@@ -7,6 +7,7 @@ set -euo pipefail
 CLOUD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_ROOT="$(cd "$CLOUD_DIR/../.." && pwd)"
 TF_DIR="$CLOUD_DIR/terraform"
+TF_BACKEND_FILE="$TF_DIR/backend.hcl"
 K8S_DIR="$CLOUD_DIR/k8s"
 RENDER_DIR="$CLOUD_DIR/.rendered"
 SECRETS_FILE="$CLOUD_DIR/.secrets.env"
@@ -34,6 +35,17 @@ tf() {
 
 tf_out() {
   ( cd "$TF_DIR" && terraform output -raw "$1" 2>/dev/null )
+}
+
+# Инициализация с remote state в Object Storage: конкретные значения бэкенда
+# лежат в backend.hcl (в .gitignore, создаётся scripts/init-state.sh). Если
+# файла нет — работаем как раньше, с локальным state.
+terraform_init() {
+  local args=(-input=false)
+  if [ -f "$TF_BACKEND_FILE" ]; then
+    args+=(-backend-config="$TF_BACKEND_FILE")
+  fi
+  tf init "${args[@]}" >/dev/null
 }
 
 registry_endpoint() { tf_out registry_endpoint; }
@@ -109,13 +121,7 @@ render_manifests() {
   tag="$(current_tag)"
   [ -n "$registry" ] || die "не удалось получить registry_endpoint из terraform"
 
-  rm -rf "$RENDER_DIR"
-  mkdir -p "$RENDER_DIR"
-  local f
-  for f in "$K8S_DIR"/*.yaml; do
-    sed -e "s|__REGISTRY__|$registry|g" -e "s|__TAG__|$tag|g" "$f" \
-      > "$RENDER_DIR/$(basename "$f")"
-  done
+  REGISTRY="$registry" TAG="$tag" "$CLOUD_DIR/scripts/render.sh"
   log "образы: $registry/recipehub-*:$tag"
 }
 

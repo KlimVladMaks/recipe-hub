@@ -20,3 +20,5 @@ site/
 deploy/cloud/.rendered/
 deploy/cloud/.last-tag
 deploy/cloud/.url
+deploy/cloud/.ci/
+deploy/cloud/terraform/backend.hcl

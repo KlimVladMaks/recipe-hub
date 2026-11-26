@@ -32,7 +32,7 @@ resource "yandex_kubernetes_cluster" "this" {
     }
   }
 
-  cluster_ipv4_range       = var.cluster_ipv4_range
+  cluster_ipv4_ranges      = [var.cluster_ipv4_range]
   service_ipv4_range       = var.service_ipv4_range
   node_ipv4_cidr_mask_size = 24
 
