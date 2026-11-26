@@ -14,6 +14,10 @@ render_manifests
 log "применяю манифесты"
 kubectl apply -f "$RENDER_DIR"
 
+# Под, застрявший на старом образе, StatefulSet сам не заменит (ждёт Ready),
+# поэтому удаляем всё, что не соответствует текущему тегу.
+NAMESPACE="$NAMESPACE" TAG="$(current_tag)" "$CLOUD_DIR/scripts/cleanup-stale-pods.sh"
+
 log "жду rollout (до 5 мин на каждый компонент)"
 kubectl -n "$NAMESPACE" rollout status statefulset/user-db --timeout=300s
 kubectl -n "$NAMESPACE" rollout status statefulset/recipe-db --timeout=300s

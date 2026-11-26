@@ -137,6 +137,10 @@ jobs:
           REGISTRY="$REGISTRY" TAG="$IMAGE_TAG" ./deploy/cloud/scripts/render.sh
           kubectl apply -f deploy/cloud/.rendered
 
+          # StatefulSet не заменит под, зависший в ImagePullBackOff на старом
+          # образе: он ждёт Ready. Удаляем такие поды, чтобы они пересоздались.
+          NAMESPACE="$NAMESPACE" TAG="$IMAGE_TAG" ./deploy/cloud/scripts/cleanup-stale-pods.sh
+
           kubectl -n "$NAMESPACE" rollout status statefulset/user-db --timeout=300s
           kubectl -n "$NAMESPACE" rollout status statefulset/recipe-db --timeout=300s
           kubectl -n "$NAMESPACE" rollout status deployment/rabbitmq --timeout=300s
