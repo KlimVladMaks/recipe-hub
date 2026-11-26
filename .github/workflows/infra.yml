@@ -91,13 +91,21 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # Один файл, один артефакт: при нескольких путях upload-artifact сохраняет
+      # общий префикс каталогов, и на скачивании plan оказывается не там, где
+      # его ждёт `terraform apply`.
       - name: Upload plan
         uses: actions/upload-artifact@v4
         with:
           name: tfplan
-          path: |
-            deploy/cloud/terraform/tfplan
-            ${{ runner.temp }}/plan-show.txt
+          path: deploy/cloud/terraform/tfplan
+          retention-days: 3
+
+      - name: Upload plan text
+        uses: actions/upload-artifact@v4
+        with:
+          name: plan-text
+          path: ${{ runner.temp }}/plan-show.txt
           retention-days: 3
 
   apply:
@@ -136,6 +144,10 @@ jobs:
         with:
           name: tfplan
           path: deploy/cloud/terraform
+
+      - name: Verify the plan file
+        working-directory: deploy/cloud/terraform
+        run: test -f tfplan && ls -l tfplan
 
       # Перед destroy нужно убрать то, что Terraform не создавал: NLB и PVC
       # появляются из Kubernetes-манифестов, а реестр нельзя удалить с образами.
