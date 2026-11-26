@@ -46,9 +46,15 @@ runs:
         printf '%s' "$YC_SA_KEY_JSON" > "$HOME/.yc/sa-key.json"
         chmod 600 "$HOME/.yc/sa-key.json"
         {
+          # Terraform-провайдер читает именно эту переменную
           echo "YC_SERVICE_ACCOUNT_KEY_FILE=$HOME/.yc/sa-key.json"
           echo "YC_CLOUD_ID=$YC_CLOUD_ID"
           echo "YC_FOLDER_ID=$YC_FOLDER_ID"
         } >> "$GITHUB_ENV"
-        "$HOME/.local/bin/yc" config set folder-id "$YC_FOLDER_ID" >/dev/null
-        echo "yc: $("$HOME/.local/bin/yc" version 2>/dev/null | head -1)"
+        # yc CLI не смотрит на YC_SERVICE_ACCOUNT_KEY_FILE: ключ задаётся
+        # в конфиге CLI. Без этого он уходит в metadata service и падает.
+        "$HOME/.local/bin/yc" config set service-account-key "$HOME/.yc/sa-key.json"
+        "$HOME/.local/bin/yc" config set cloud-id "$YC_CLOUD_ID"
+        "$HOME/.local/bin/yc" config set folder-id "$YC_FOLDER_ID"
+        "$HOME/.local/bin/yc" iam create-token >/dev/null
+        echo "yc: аутентификация сервисным аккаунтом работает ($("$HOME/.local/bin/yc" version 2>/dev/null | head -1))"
